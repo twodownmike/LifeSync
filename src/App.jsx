@@ -40,8 +40,8 @@ import {
   Key,
   Eye,
   EyeOff,
-  Send,      // Added
-  MessageSquare // Added
+  Send,      
+  MessageSquare 
 } from 'lucide-react';
 
 // --- Firebase Imports ---
@@ -63,9 +63,9 @@ import {
   doc, 
   onSnapshot, 
   setDoc,
-  query,     // Added
-  orderBy,   // Added
-  limit      // Added
+  query,     
+  orderBy,   
+  limit      
 } from 'firebase/firestore';
 
 // --- Firebase Initialization ---
@@ -755,25 +755,58 @@ export default function LifeSync() {
             createdAt: new Date().toISOString()
         });
 
-        // 2. Build Context
-        const recentLogs = entries.slice(0, 10).map(e => 
-            `- ${e.type.toUpperCase()} (${new Date(e.timestamp).toLocaleTimeString()}): ${e.title}. ${e.note || ''}`
+        // 2. Build Rich Context from Logs
+        const allMeals = entries.filter(e => e.type === 'meal').map(e => 
+            `- ${new Date(e.timestamp).toLocaleDateString()} ${new Date(e.timestamp).toLocaleTimeString()}: ${e.title} (${e.note || ''})`
         ).join('\n');
+
+        const allWorkouts = entries.filter(e => e.type === 'workout').map(e => {
+            const exercises = e.exercises ? e.exercises.map(ex => `${ex.name} ${ex.weight}lb x ${ex.reps}`).join(', ') : '';
+            return `- ${new Date(e.timestamp).toLocaleDateString()}: ${e.title} ${exercises ? '[' + exercises + ']' : ''} (${e.note || ''})`;
+        }).join('\n');
+
+        const allJournals = entries.filter(e => e.type === 'journal').map(e => 
+            `- ${new Date(e.timestamp).toLocaleDateString()}: ${e.title} - ${e.note || ''}`
+        ).join('\n');
+
+        const fastingContext = `
+        Current Fasting Status:
+        - State: ${fastingData.label}
+        - Hours Fasted: ${fastingData.hours} hours, ${fastingData.minutes} minutes
+        - Last Meal: ${lastMeal ? new Date(lastMeal.timestamp).toLocaleString() : 'None recorded'}
+        `;
 
         const systemPrompt = `
           You are LifeSync AI, an elite fitness and lifestyle coach.
-          User: ${userSettings.displayName}. Goal: ${userSettings.fitnessGoal}. Diet: ${userSettings.dietaryPreferences}.
-          Time: ${currentTime.toLocaleTimeString()}. Phase: ${bioPhase.title}. Fasting: ${fastingData.hours}h.
           
-          Recent Logs:
-          ${recentLogs}
+          USER PROFILE:
+          - Name: ${userSettings.displayName}
+          - Goal: ${userSettings.fitnessGoal || 'General Health'}
+          - Diet: ${userSettings.dietaryPreferences || 'Balanced'}
+          - Current Time: ${currentTime.toLocaleString()}
+          - Bio Phase: ${bioPhase.title} (${bioPhase.desc})
+          
+          FASTING DATA:
+          ${fastingContext}
+          
+          HISTORY & LOGS:
+          
+          [MEAL LOGS]
+          ${allMeals || "No meals logged."}
+          
+          [WORKOUT LOGS]
+          ${allWorkouts || "No workouts logged."}
+          
+          [JOURNAL ENTRIES]
+          ${allJournals || "No journal entries."}
 
           Respond with a concise, punchy, markdown formatted plan or answer. 
           Use ### for headers and ** for bold. Keep it actionable.
+          Be context aware of their past workouts and meals to suggest progressions or dietary adjustments.
         `;
 
-        // Include recent chat history for context (last 6 messages)
-        const history = coachMessages.slice(-6).map(m => ({ role: m.role, content: m.content }));
+        // 3. Include Full Chat History
+        const history = coachMessages.map(m => ({ role: m.role, content: m.content }));
 
         const apiMessages = [
             { role: "system", content: systemPrompt },
@@ -790,14 +823,14 @@ export default function LifeSync() {
             body: JSON.stringify({
               model: "gpt-4o-mini",
               messages: apiMessages,
-              max_tokens: 400
+              max_tokens: 500
             })
         });
 
         const data = await response.json();
         if (data.error) throw new Error(data.error.message);
 
-        // 3. Save AI Response
+        // 4. Save AI Response
         await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'coach_messages'), {
             role: 'assistant',
             content: data.choices[0].message.content,
