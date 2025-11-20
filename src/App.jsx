@@ -53,7 +53,6 @@ import {
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
-  signInWithCustomToken, 
   signInAnonymously, 
   onAuthStateChanged,
   GoogleAuthProvider,
@@ -69,9 +68,9 @@ import {
   onSnapshot, 
   setDoc,
   updateDoc,
-  query,     
-  orderBy,   
-  limit      
+  query,      
+  orderBy,    
+  limit       
 } from 'firebase/firestore';
 
 // --- Firebase Initialization ---
@@ -194,15 +193,15 @@ const calculateStreak = (entries) => {
   if (!entries.length) return 0;
   const dates = [...new Set(entries.map(e => new Date(e.timestamp).toDateString()))];
   dates.sort((a, b) => new Date(b) - new Date(a));
-   
+    
   let streak = 0;
   const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86400000).toDateString();
-   
+    
   if (dates[0] !== today && dates[0] !== yesterday) return 0;
 
   let currentDate = new Date(dates[0]);
-   
+    
   for (let i = 0; i < dates.length; i++) {
     const d = new Date(dates[i]);
     const diff = Math.abs(currentDate - d);
@@ -248,21 +247,6 @@ const Button = ({ onClick, variant = "primary", children, className = "", icon: 
     </button>
   );
 };
-
-const StatBar = ({ label, value, max, color }) => (
-  <div className="flex flex-col gap-1 mb-3">
-    <div className="flex justify-between text-xs text-zinc-400">
-      <span>{label}</span>
-      <span>{value}</span>
-    </div>
-    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-      <div 
-        className={`h-full rounded-full ${color} transition-all duration-500`} 
-        style={{ width: `${Math.min((value / max) * 100, 100)}%` }} 
-      />
-    </div>
-  </div>
-);
 
 const TimelineEntry = ({ entry, onDelete }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -400,7 +384,7 @@ export default function LifeSync() {
     displayName: 'Guest', 
     fastingGoal: 16,
     fitnessGoal: '',
-    dietGoal: '', // New field
+    dietGoal: '', 
     dietaryPreferences: '',
     unlockedAchievements: [],
     activeDetox: null 
@@ -561,7 +545,7 @@ export default function LifeSync() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000); 
     return () => clearInterval(timer);
   }, []);
-   
+    
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentMantra(MANTRAS[Math.floor(Math.random() * MANTRAS.length)]);
@@ -577,14 +561,17 @@ export default function LifeSync() {
 
   const fastingData = useMemo(() => {
     if (!lastMeal) return { hours: 0, minutes: 0, seconds: 0, progress: 0, label: "Start your first fast" };
-     
+      
     const lastMealDate = new Date(lastMeal.timestamp);
     const diffMs = currentTime - lastMealDate;
-    const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    const diffSecs = Math.floor((diffMs % (1000 * 60)) / 1000);
-     
-    const goal = userSettings.fastingGoal || 16;
+    // Protect against future dates causing negative
+    const safeDiffMs = Math.max(0, diffMs); 
+
+    const diffHrs = Math.floor(safeDiffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor((safeDiffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const diffSecs = Math.floor((safeDiffMs % (1000 * 60)) / 1000);
+      
+    const goal = userSettings.fastingGoal > 0 ? userSettings.fastingGoal : 16;
     const progress = Math.min((diffHrs / goal) * 100, 100);
 
     let label = "Fat Burning Zone";
@@ -597,12 +584,14 @@ export default function LifeSync() {
 
   const detoxData = useMemo(() => {
     if (!userSettings.activeDetox) return null;
-     
+      
     const startTime = new Date(userSettings.activeDetox.startTime);
     const diffMs = currentTime - startTime;
-    const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    const diffSecs = Math.floor((diffMs % (1000 * 60)) / 1000);
+    const safeDiffMs = Math.max(0, diffMs);
+
+    const diffHrs = Math.floor(safeDiffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor((safeDiffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const diffSecs = Math.floor((safeDiffMs % (1000 * 60)) / 1000);
 
     return { hours: diffHrs, minutes: diffMins, seconds: diffSecs };
   }, [userSettings.activeDetox, currentTime]);
@@ -614,23 +603,6 @@ export default function LifeSync() {
     return { id: 3, title: "Phase 3", desc: "Rest", color: "text-zinc-400 border-zinc-500/30 bg-zinc-500/10" };
   }, [currentTime]);
 
-  const stats = useMemo(() => {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const recentEntries = entries.filter(e => new Date(e.timestamp) > oneWeekAgo);
-     
-    const detoxMinutes = recentEntries
-      .filter(e => e.type === 'detox')
-      .reduce((acc, curr) => acc + (curr.duration || 0), 0);
-
-    return {
-      meals: recentEntries.filter(e => e.type === 'meal').length,
-      workouts: recentEntries.filter(e => e.type === 'workout').length,
-      journals: recentEntries.filter(e => e.type === 'journal').length,
-      detox: Math.round(detoxMinutes / 60) // in hours
-    };
-  }, [entries]);
-
   // --- Achievement Logic ---
 
   useEffect(() => {
@@ -638,7 +610,7 @@ export default function LifeSync() {
 
     const currentUnlocked = userSettings.unlockedAchievements || [];
     let newUnlockId = null;
-     
+      
     const updatedUnlocked = [...currentUnlocked];
     let hasUpdates = false;
 
@@ -722,9 +694,9 @@ export default function LifeSync() {
      
      let newDates = routine.completedDates || [];
      if (isCompleted) {
-        newDates = newDates.filter(d => d !== today);
+       newDates = newDates.filter(d => d !== today);
      } else {
-        newDates.push(today);
+       newDates.push(today);
      }
 
      try {
@@ -1047,77 +1019,85 @@ export default function LifeSync() {
     </div>
   );
 
-  const renderFasting = () => (
-    <div className="flex flex-col items-center pt-10 h-full pb-20 animate-fade-in relative min-h-[60vh]">
-      <div className="absolute top-0 right-0">
-        <button 
-          onClick={() => setIsInfoModalOpen(true)}
-          className="text-zinc-500 hover:text-emerald-400 transition-colors p-2"
-        >
-          <Info size={22} />
-        </button>
-      </div>
+  const renderFasting = () => {
+    // Calculation safe-guard for strokeDashoffset to avoid NaN/Infinity errors rendering blank screen
+    const radius = 120;
+    const circumference = 2 * Math.PI * radius;
+    const safeProgress = Number.isFinite(fastingData.progress) ? fastingData.progress : 0;
+    const offset = circumference * (1 - safeProgress / 100);
 
-      <div className="relative w-64 h-64 flex items-center justify-center mb-8">
-        <div className="absolute inset-0 rounded-full border-8 border-zinc-800"></div>
-        <svg className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-          <circle
-            cx="128"
-            cy="128"
-            r="120"
-            stroke="currentColor"
-            strokeWidth="8"
-            fill="transparent"
-            className="text-emerald-500 transition-all duration-1000 ease-linear" 
-            strokeDasharray={2 * Math.PI * 120}
-            strokeDashoffset={2 * Math.PI * 120 * (1 - (Number.isNaN(fastingData.progress) ? 0 : fastingData.progress) / 100)}
-            strokeLinecap="round"
-          />
-        </svg>
-        
-        <div className="text-center z-10 flex flex-col items-center">
-          <div className="text-zinc-400 text-sm font-medium mb-2">Current Fast</div>
-          <div className="text-5xl font-bold text-white font-mono tracking-tighter flex items-baseline">
-            <span>{fastingData.hours}</span>
-            <span className="mx-1">:</span>
-            <span>{fastingData.minutes.toString().padStart(2, '0')}</span>
-          </div>
-          <div className="text-2xl font-mono text-zinc-500 mt-1 font-bold">
-             {fastingData.seconds.toString().padStart(2, '0')}
-          </div>
-          <div className="text-emerald-400 text-xs font-bold uppercase tracking-widest mt-3">
-            {fastingData.label}
+    return (
+      <div className="flex flex-col items-center pt-10 h-full pb-20 animate-fade-in relative min-h-[60vh]">
+        <div className="absolute top-0 right-0">
+          <button 
+            onClick={() => setIsInfoModalOpen(true)}
+            className="text-zinc-500 hover:text-emerald-400 transition-colors p-2"
+          >
+            <Info size={22} />
+          </button>
+        </div>
+
+        <div className="relative w-64 h-64 flex items-center justify-center mb-8">
+          <div className="absolute inset-0 rounded-full border-8 border-zinc-800"></div>
+          <svg className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+            <circle
+              cx="128"
+              cy="128"
+              r={radius}
+              stroke="currentColor"
+              strokeWidth="8"
+              fill="transparent"
+              className="text-emerald-500 transition-all duration-1000 ease-linear" 
+              strokeDasharray={circumference}
+              strokeDashoffset={Number.isNaN(offset) ? circumference : offset}
+              strokeLinecap="round"
+            />
+          </svg>
+          
+          <div className="text-center z-10 flex flex-col items-center">
+            <div className="text-zinc-400 text-sm font-medium mb-2">Current Fast</div>
+            <div className="text-5xl font-bold text-white font-mono tracking-tighter flex items-baseline">
+              <span>{fastingData.hours}</span>
+              <span className="mx-1">:</span>
+              <span>{fastingData.minutes.toString().padStart(2, '0')}</span>
+            </div>
+            <div className="text-2xl font-mono text-zinc-500 mt-1 font-bold">
+               {fastingData.seconds.toString().padStart(2, '0')}
+            </div>
+            <div className="text-emerald-400 text-xs font-bold uppercase tracking-widest mt-3">
+              {fastingData.label}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="w-full max-w-xs grid grid-cols-2 gap-4">
-        <Card className="text-center py-4">
-          <div className="text-zinc-500 text-xs mb-1">Last Meal</div>
-          <div className="text-zinc-200 font-medium">
-            {lastMeal ? new Date(lastMeal.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}
-          </div>
-        </Card>
-        
-        <Card 
-          onClick={openGoalModal}
-          className="text-center py-4 cursor-pointer hover:bg-zinc-800/50 transition-colors relative group"
-        >
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500">
-             <Edit2 size={12} />
-          </div>
-          <div className="text-zinc-500 text-xs mb-1">Goal</div>
-          <div className="text-zinc-200 font-medium">{userSettings.fastingGoal} Hours</div>
-        </Card>
-      </div>
-
-      {fastingData.hours >= userSettings.fastingGoal && (
-        <div className="mt-8 bg-emerald-500/10 text-emerald-400 px-4 py-2 rounded-full text-sm font-medium animate-pulse">
-          Target Reached!
+        <div className="w-full max-w-xs grid grid-cols-2 gap-4">
+          <Card className="text-center py-4">
+            <div className="text-zinc-500 text-xs mb-1">Last Meal</div>
+            <div className="text-zinc-200 font-medium">
+              {lastMeal ? new Date(lastMeal.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}
+            </div>
+          </Card>
+          
+          <Card 
+            onClick={openGoalModal}
+            className="text-center py-4 cursor-pointer hover:bg-zinc-800/50 transition-colors relative group"
+          >
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500">
+               <Edit2 size={12} />
+            </div>
+            <div className="text-zinc-500 text-xs mb-1">Goal</div>
+            <div className="text-zinc-200 font-medium">{userSettings.fastingGoal} Hours</div>
+          </Card>
         </div>
-      )}
-    </div>
-  );
+
+        {fastingData.hours >= userSettings.fastingGoal && (
+          <div className="mt-8 bg-emerald-500/10 text-emerald-400 px-4 py-2 rounded-full text-sm font-medium animate-pulse">
+            Target Reached!
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderRoutine = () => {
      const todayIndex = new Date().getDay();
@@ -1174,27 +1154,27 @@ export default function LifeSync() {
                         className={`relative flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer group
                            ${isCompleted ? 'bg-zinc-900/30 border-zinc-800 opacity-60' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`}
                       >
-                         <div className={`${isCompleted ? 'text-zinc-600' : colors[routine.type].split(' ')[0]}`}>
+                          <div className={`${isCompleted ? 'text-zinc-600' : colors[routine.type].split(' ')[0]}`}>
                             {isCompleted ? <CheckCircle size={24} /> : <Circle size={24} />}
-                         </div>
-                         
-                         <div className="flex-1">
-                            <div className={`font-medium ${isCompleted ? 'text-zinc-500 line-through' : 'text-zinc-200'}`}>
-                              {routine.title}
-                            </div>
-                            <div className="flex gap-2 mt-1">
+                          </div>
+                          
+                          <div className="flex-1">
+                             <div className={`font-medium ${isCompleted ? 'text-zinc-500 line-through' : 'text-zinc-200'}`}>
+                               {routine.title}
+                             </div>
+                             <div className="flex gap-2 mt-1">
                                <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${colors[routine.type]}`}>
                                  {routine.type}
                                </span>
-                            </div>
-                         </div>
+                             </div>
+                          </div>
 
-                         <button 
-                            onClick={(e) => { e.stopPropagation(); handleDeleteRoutine(routine.id); }}
-                            className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-all"
-                         >
-                            <Trash2 size={16} />
-                         </button>
+                          <button 
+                             onClick={(e) => { e.stopPropagation(); handleDeleteRoutine(routine.id); }}
+                             className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-all"
+                          >
+                             <Trash2 size={16} />
+                          </button>
                       </div>
                    )
                 })}
@@ -1208,58 +1188,58 @@ export default function LifeSync() {
                    
                    <div className="space-y-4">
                       <div>
-                         <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Task Name</label>
-                         <input 
-                           type="text" 
-                           placeholder="e.g. Morning Journal" 
-                           value={routineTitle}
-                           onChange={(e) => setRoutineTitle(e.target.value)}
-                           className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500"
-                         />
+                          <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Task Name</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. Morning Journal" 
+                            value={routineTitle}
+                            onChange={(e) => setRoutineTitle(e.target.value)}
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500"
+                          />
                       </div>
 
                       <div>
-                         <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Category</label>
-                         <div className="grid grid-cols-3 gap-2">
-                            {['diet', 'exercise', 'mindset'].map(t => (
-                               <button
-                                 key={t}
-                                 onClick={() => setRoutineType(t)}
-                                 className={`py-2 rounded-lg text-xs font-bold uppercase transition-colors border
-                                   ${routineType === t 
-                                      ? 'bg-zinc-800 text-white border-zinc-600' 
-                                      : 'bg-zinc-950 text-zinc-500 border-zinc-800 hover:border-zinc-700'}`}
-                               >
-                                 {t}
-                               </button>
-                            ))}
-                         </div>
+                          <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Category</label>
+                          <div className="grid grid-cols-3 gap-2">
+                             {['diet', 'exercise', 'mindset'].map(t => (
+                                <button
+                                  key={t}
+                                  onClick={() => setRoutineType(t)}
+                                  className={`py-2 rounded-lg text-xs font-bold uppercase transition-colors border
+                                    ${routineType === t 
+                                       ? 'bg-zinc-800 text-white border-zinc-600' 
+                                       : 'bg-zinc-950 text-zinc-500 border-zinc-800 hover:border-zinc-700'}`}
+                                >
+                                  {t}
+                                </button>
+                             ))}
+                          </div>
                       </div>
 
                       <div>
-                         <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Days of Week</label>
-                         <div className="flex justify-between gap-1">
-                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                               <button
-                                 key={i}
-                                 onClick={() => toggleDay(i)}
-                                 className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-all
-                                   ${routineDays.includes(i) 
-                                      ? 'bg-violet-600 text-white' 
-                                      : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700'}`}
-                               >
-                                 {d}
-                               </button>
-                            ))}
-                         </div>
-                         <p className="text-[10px] text-zinc-500 mt-2 text-center">
-                            {routineDays.length === 0 ? "Select days or leave empty for Daily" : ""}
-                         </p>
+                          <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Days of Week</label>
+                          <div className="flex justify-between gap-1">
+                             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                                <button
+                                  key={i}
+                                  onClick={() => toggleDay(i)}
+                                  className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-all
+                                    ${routineDays.includes(i) 
+                                       ? 'bg-violet-600 text-white' 
+                                       : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700'}`}
+                                >
+                                  {d}
+                                </button>
+                             ))}
+                          </div>
+                          <p className="text-[10px] text-zinc-500 mt-2 text-center">
+                             {routineDays.length === 0 ? "Select days or leave empty for Daily" : ""}
+                          </p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 mt-6">
-                         <Button variant="ghost" onClick={() => setIsRoutineModalOpen(false)} className="bg-zinc-800 text-zinc-400 hover:bg-zinc-700">Cancel</Button>
-                         <Button onClick={handleCreateRoutine} disabled={isSaving || !routineTitle}>Create</Button>
+                          <Button variant="ghost" onClick={() => setIsRoutineModalOpen(false)} className="bg-zinc-800 text-zinc-400 hover:bg-zinc-700">Cancel</Button>
+                          <Button onClick={handleCreateRoutine} disabled={isSaving || !routineTitle}>Create</Button>
                       </div>
                    </div>
                 </div>
@@ -1364,9 +1344,9 @@ export default function LifeSync() {
                
                {coachLoading && (
                  <div className="flex justify-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0 mt-1">
-                        <Sparkles size={14} className="text-violet-400" />
-                     </div>
+                   <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0 mt-1">
+                       <Sparkles size={14} className="text-violet-400" />
+                    </div>
                    <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 flex gap-2 items-center rounded-tl-sm">
                      <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce"></span>
                      <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce delay-100"></span>
@@ -1473,26 +1453,26 @@ export default function LifeSync() {
           <h2 className="text-2xl font-bold text-white mb-6">Dopamine Detox</h2>
           
           <div className="grid grid-cols-2 gap-4 mb-6">
-             <button onClick={() => handleStartDetox('Social Media')} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left">
-                <Smartphone className="text-zinc-500 group-hover:text-cyan-400 mb-3 transition-colors" size={28} />
-                <div className="font-bold text-white">Digital</div>
-                <div className="text-xs text-zinc-500">Socials & scrolling</div>
-             </button>
-             <button onClick={() => handleStartDetox('Gaming')} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left">
-                <Gamepad2 className="text-zinc-500 group-hover:text-cyan-400 mb-3 transition-colors" size={28} />
-                <div className="font-bold text-white">Gaming</div>
-                <div className="text-xs text-zinc-500">Video games</div>
-             </button>
-             <button onClick={() => handleStartDetox('Shopping')} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left">
-                <ShoppingBag className="text-zinc-500 group-hover:text-cyan-400 mb-3 transition-colors" size={28} />
-                <div className="font-bold text-white">Consumer</div>
-                <div className="text-xs text-zinc-500">Online shopping</div>
-             </button>
-             <button onClick={() => handleStartDetox('Dopamine')} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left">
-                <Brain className="text-zinc-500 group-hover:text-cyan-400 mb-3 transition-colors" size={28} />
-                <div className="font-bold text-white">Total Detox</div>
-                <div className="text-xs text-zinc-500">No cheap thrills</div>
-             </button>
+              <button onClick={() => handleStartDetox('Social Media')} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left">
+                 <Smartphone className="text-zinc-500 group-hover:text-cyan-400 mb-3 transition-colors" size={28} />
+                 <div className="font-bold text-white">Digital</div>
+                 <div className="text-xs text-zinc-500">Socials & scrolling</div>
+              </button>
+              <button onClick={() => handleStartDetox('Gaming')} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left">
+                 <Gamepad2 className="text-zinc-500 group-hover:text-cyan-400 mb-3 transition-colors" size={28} />
+                 <div className="font-bold text-white">Gaming</div>
+                 <div className="text-xs text-zinc-500">Video games</div>
+              </button>
+              <button onClick={() => handleStartDetox('Shopping')} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left">
+                 <ShoppingBag className="text-zinc-500 group-hover:text-cyan-400 mb-3 transition-colors" size={28} />
+                 <div className="font-bold text-white">Consumer</div>
+                 <div className="text-xs text-zinc-500">Online shopping</div>
+              </button>
+              <button onClick={() => handleStartDetox('Dopamine')} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left">
+                 <Brain className="text-zinc-500 group-hover:text-cyan-400 mb-3 transition-colors" size={28} />
+                 <div className="font-bold text-white">Total Detox</div>
+                 <div className="text-xs text-zinc-500">No cheap thrills</div>
+              </button>
           </div>
 
           {/* Protocol Card */}
@@ -1500,24 +1480,24 @@ export default function LifeSync() {
             onClick={() => setIsManifestoOpen(true)}
             className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-zinc-800 transition-colors mb-6 group"
           >
-             <div className="p-3 bg-cyan-500/10 rounded-full text-cyan-400 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all">
-               <Scroll size={24} />
-             </div>
-             <div className="flex-1">
-               <h3 className="font-bold text-white">Dopamine Protocol</h3>
-               <p className="text-xs text-zinc-500">Read the 11 rules for mental clarity.</p>
-             </div>
-             <ChevronRight className="text-zinc-600 group-hover:text-white" />
+              <div className="p-3 bg-cyan-500/10 rounded-full text-cyan-400 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all">
+                <Scroll size={24} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-white">Dopamine Protocol</h3>
+                <p className="text-xs text-zinc-500">Read the 11 rules for mental clarity.</p>
+              </div>
+              <ChevronRight className="text-zinc-600 group-hover:text-white" />
           </div>
 
           <div className="bg-cyan-500/10 border border-cyan-500/20 p-6 rounded-3xl mt-auto relative overflow-hidden">
-             <div className="relative z-10">
-               <h3 className="font-bold text-cyan-400 text-lg mb-2">Why Detox?</h3>
-               <p className="text-cyan-100/80 text-sm leading-relaxed">
-                 Constant stimulation reduces your brain's sensitivity to dopamine. Taking a break resets your baseline, making hard things feel easier.
-               </p>
-             </div>
-             <Shield className="absolute -bottom-4 -right-4 text-cyan-500/10" size={120} />
+              <div className="relative z-10">
+                <h3 className="font-bold text-cyan-400 text-lg mb-2">Why Detox?</h3>
+                <p className="text-cyan-100/80 text-sm leading-relaxed">
+                  Constant stimulation reduces your brain's sensitivity to dopamine. Taking a break resets your baseline, making hard things feel easier.
+                </p>
+              </div>
+              <Shield className="absolute -bottom-4 -right-4 text-cyan-500/10" size={120} />
           </div>
        </div>
      )
@@ -1816,14 +1796,14 @@ export default function LifeSync() {
           <div className="text-center text-zinc-400 mb-6 text-sm font-medium tracking-wide uppercase">What would you like to log?</div>
           
           {['meal', 'workout', 'journal'].map(type => {
-             const icons = { meal: Utensils, workout: Dumbbell, journal: BookOpen };
-             const colors = { meal: 'orange', workout: 'emerald', journal: 'violet' };
-             const labels = { meal: 'Log Meal', workout: 'Log Workout', journal: 'Log Journal' };
-             const sub = { meal: 'Track calories & fasting', workout: 'Exercises & duration', journal: 'Notes & mood' };
-             const Icon = icons[type];
-             const color = colors[type];
-             
-             return (
+              const icons = { meal: Utensils, workout: Dumbbell, journal: BookOpen };
+              const colors = { meal: 'orange', workout: 'emerald', journal: 'violet' };
+              const labels = { meal: 'Log Meal', workout: 'Log Workout', journal: 'Log Journal' };
+              const sub = { meal: 'Track calories & fasting', workout: 'Exercises & duration', journal: 'Notes & mood' };
+              const Icon = icons[type];
+              const color = colors[type];
+              
+              return (
               <button 
                 key={type}
                 onClick={() => openModal(type)}
@@ -1838,7 +1818,7 @@ export default function LifeSync() {
                 </div>
                 <ChevronRight className="ml-auto text-zinc-600" />
               </button>
-             );
+              );
           })}
 
           <button 
@@ -2049,7 +2029,7 @@ export default function LifeSync() {
         </header>
 
         {/* Content */}
-        <div className="flex-1 p-6 overflow-y-auto h-[calc(100vh-80px-80px)]"> {/* Added height constraint for scrolling */}
+        <div className="flex-1 p-6 overflow-y-auto h-[calc(100vh-160px)]"> 
           {activeTab === 'home' && renderTimeline()}
           {activeTab === 'fasting' && renderFasting()}
           {activeTab === 'coach' && renderCoach()}
@@ -2061,58 +2041,58 @@ export default function LifeSync() {
         {/* Bottom Nav */}
         {activeTab !== 'profile' && (
           <nav className="fixed bottom-0 left-0 right-0 z-30 bg-zinc-950/90 backdrop-blur-lg border-t border-zinc-800 pb-safe">
-            <div className="max-w-md mx-auto px-6 h-20 flex items-center justify-between relative">
+            <div className="max-w-md mx-auto px-2 h-20 flex items-center justify-around relative">
               
               <button 
                 onClick={() => setActiveTab('home')}
-                className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'home' ? 'text-white' : 'text-zinc-600'}`}
+                className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'home' ? 'text-white' : 'text-zinc-600'}`}
               >
-                <Home size={24} />
-                <span className="text-[10px] font-medium">Timeline</span>
+                <Home size={20} />
+                <span className="text-[9px] font-medium">Home</span>
               </button>
 
               <button 
                 onClick={() => setActiveTab('fasting')}
-                className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'fasting' ? 'text-emerald-400' : 'text-zinc-600'}`}
+                className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'fasting' ? 'text-emerald-400' : 'text-zinc-600'}`}
               >
-                <Clock size={24} />
-                <span className="text-[10px] font-medium">Fasting</span>
+                <Clock size={20} />
+                <span className="text-[9px] font-medium">Fast</span>
               </button>
               
               {/* Routine Button */}
               <button 
                 onClick={() => setActiveTab('routine')}
-                className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'routine' ? 'text-orange-400' : 'text-zinc-600'}`}
+                className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'routine' ? 'text-orange-400' : 'text-zinc-600'}`}
               >
-                <ListChecks size={24} />
-                <span className="text-[10px] font-medium">Routine</span>
+                <ListChecks size={20} />
+                <span className="text-[9px] font-medium">Plan</span>
               </button>
 
-              <div className="relative -top-6">
+              <div className="relative -top-6 mx-1">
                 <button 
                   onClick={() => setIsTypeSelectorOpen(true)}
-                  className={`h-14 w-14 rounded-full flex items-center justify-center shadow-lg transition-all duration-300
+                  className={`h-12 w-12 rounded-full flex items-center justify-center shadow-lg transition-all duration-300
                     ${isTypeSelectorOpen ? 'bg-zinc-800 text-zinc-400 rotate-45' : 'bg-white text-zinc-950 hover:scale-105 shadow-white/20'}`}
                 >
-                  <Plus size={28} strokeWidth={2.5} />
+                  <Plus size={24} strokeWidth={2.5} />
                 </button>
               </div>
               
               {/* Detox Button */}
               <button 
                 onClick={() => setActiveTab('detox')}
-                className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'detox' ? 'text-cyan-400' : 'text-zinc-600'}`}
+                className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'detox' ? 'text-cyan-400' : 'text-zinc-600'}`}
               >
-                <Brain size={24} />
-                <span className="text-[10px] font-medium">Detox</span>
+                <Brain size={20} />
+                <span className="text-[9px] font-medium">Detox</span>
               </button>
 
               <button 
                 onClick={() => setActiveTab('coach')}
-                className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'coach' ? 'text-violet-400' : 'text-zinc-600'}`}
+                className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'coach' ? 'text-violet-400' : 'text-zinc-600'}`}
               >
-                <Sparkles size={24} />
-                <span className="text-[10px] font-medium">Coach</span>
+                <Sparkles size={20} />
+                <span className="text-[9px] font-medium">Coach</span>
               </button>
 
             </div>
