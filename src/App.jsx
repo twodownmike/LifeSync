@@ -4,12 +4,12 @@ import {
   Minus, 
   Utensils, 
   Dumbbell, 
+  Trash2, 
   BookOpen, 
   Clock, 
   TrendingUp, 
   Home, 
   X, 
-  Trash2,
   Activity,
   User,
   Settings,
@@ -1271,9 +1271,9 @@ export default function LifeSync() {
             <button 
               onClick={handleClearChat}
               className="p-2 text-zinc-500 hover:text-red-400 transition-colors rounded-full hover:bg-zinc-800"
-              title="Clear Chat"
+              title="Reset Chat"
             >
-              <RefreshCw size={18} />
+              <Trash2 size={18} />
             </button>
           )}
         </div>
@@ -2041,34 +2041,37 @@ export default function LifeSync() {
         {/* Bottom Nav */}
         {activeTab !== 'profile' && (
           <nav className="fixed bottom-0 left-0 right-0 z-30 bg-zinc-950/90 backdrop-blur-lg border-t border-zinc-800 pb-safe">
-            <div className="max-w-md mx-auto px-2 h-20 flex items-center justify-around relative">
+            <div className="max-w-md mx-auto px-2 h-20 flex items-center justify-between relative">
               
-              <button 
-                onClick={() => setActiveTab('home')}
-                className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'home' ? 'text-white' : 'text-zinc-600'}`}
-              >
-                <Home size={20} />
-                <span className="text-[9px] font-medium">Home</span>
-              </button>
+              {/* Left Side */}
+              <div className="flex items-center justify-around flex-1">
+                <button 
+                  onClick={() => setActiveTab('home')}
+                  className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'home' ? 'text-white' : 'text-zinc-600'}`}
+                >
+                  <Home size={20} />
+                  <span className="text-[9px] font-medium">Home</span>
+                </button>
 
-              <button 
-                onClick={() => setActiveTab('fasting')}
-                className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'fasting' ? 'text-emerald-400' : 'text-zinc-600'}`}
-              >
-                <Clock size={20} />
-                <span className="text-[9px] font-medium">Fast</span>
-              </button>
-              
-              {/* Routine Button */}
-              <button 
-                onClick={() => setActiveTab('routine')}
-                className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'routine' ? 'text-orange-400' : 'text-zinc-600'}`}
-              >
-                <ListChecks size={20} />
-                <span className="text-[9px] font-medium">Plan</span>
-              </button>
+                <button 
+                  onClick={() => setActiveTab('fasting')}
+                  className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'fasting' ? 'text-emerald-400' : 'text-zinc-600'}`}
+                >
+                  <Clock size={20} />
+                  <span className="text-[9px] font-medium">Fast</span>
+                </button>
+                
+                <button 
+                  onClick={() => setActiveTab('routine')}
+                  className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'routine' ? 'text-orange-400' : 'text-zinc-600'}`}
+                >
+                  <ListChecks size={20} />
+                  <span className="text-[9px] font-medium">Plan</span>
+                </button>
+              </div>
 
-              <div className="relative -top-6 mx-1">
+              {/* Center Plus Button */}
+              <div className="absolute left-1/2 -translate-x-1/2 -top-6 z-10">
                 <button 
                   onClick={() => setIsTypeSelectorOpen(true)}
                   className={`h-12 w-12 rounded-full flex items-center justify-center shadow-lg transition-all duration-300
@@ -2078,22 +2081,27 @@ export default function LifeSync() {
                 </button>
               </div>
               
-              {/* Detox Button */}
-              <button 
-                onClick={() => setActiveTab('detox')}
-                className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'detox' ? 'text-cyan-400' : 'text-zinc-600'}`}
-              >
-                <Brain size={20} />
-                <span className="text-[9px] font-medium">Detox</span>
-              </button>
+              {/* Right Side */}
+              <div className="flex items-center justify-around flex-1">
+                <button 
+                  onClick={() => setActiveTab('detox')}
+                  className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'detox' ? 'text-cyan-400' : 'text-zinc-600'}`}
+                >
+                  <Brain size={20} />
+                  <span className="text-[9px] font-medium">Detox</span>
+                </button>
 
-              <button 
-                onClick={() => setActiveTab('coach')}
-                className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'coach' ? 'text-violet-400' : 'text-zinc-600'}`}
-              >
-                <Sparkles size={20} />
-                <span className="text-[9px] font-medium">Coach</span>
-              </button>
+                <button 
+                  onClick={() => setActiveTab('coach')}
+                  className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'coach' ? 'text-violet-400' : 'text-zinc-600'}`}
+                >
+                  <Sparkles size={20} />
+                  <span className="text-[9px] font-medium">Coach</span>
+                </button>
+                
+                {/* Dummy Item for Spacing Balance */}
+                <div className="min-w-[40px] opacity-0 pointer-events-none"></div>
+              </div>
 
             </div>
           </nav>
