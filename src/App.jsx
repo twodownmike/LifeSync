@@ -431,6 +431,11 @@ export default function LifeSync() {
   const [routineType, setRoutineType] = useState('mindset');
   const [routineDays, setRoutineDays] = useState([]); // Array of day indexes 0-6
 
+  // Manual Detox State
+  const [manualDetoxStart, setManualDetoxStart] = useState('');
+  const [manualDetoxEnd, setManualDetoxEnd] = useState('');
+  const [manualDetoxNote, setManualDetoxNote] = useState('');
+
   // --- Authentication & Initial Setup ---
 
   useEffect(() => {
@@ -776,6 +781,39 @@ export default function LifeSync() {
       console.error("Error ending detox:", err);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleManualDetoxLog = async () => {
+    if (!user || !manualDetoxStart || !manualDetoxEnd) return;
+    setIsSaving(true);
+    try {
+        const start = new Date(manualDetoxStart);
+        const end = new Date(manualDetoxEnd);
+        const durationMinutes = Math.floor((end - start) / (1000 * 60));
+
+        if (durationMinutes < 1) {
+            alert("End time must be after start time.");
+            return;
+        }
+
+        const newEntry = {
+          type: 'detox',
+          title: 'Manual Detox Log',
+          note: manualDetoxNote,
+          tags: ['mindfulness', 'detox', 'manual'],
+          duration: durationMinutes,
+          timestamp: end.toISOString(),
+        };
+        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'entries'), newEntry);
+        setManualDetoxStart('');
+        setManualDetoxEnd('');
+        setManualDetoxNote('');
+        alert("Detox session logged!");
+    } catch (err) {
+        console.error("Error logging manual detox:", err);
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -1452,27 +1490,74 @@ export default function LifeSync() {
        <div className="flex flex-col h-full pb-24 animate-fade-in">
           <h2 className="text-2xl font-bold text-white mb-6">Dopamine Detox</h2>
           
-          <div className="grid grid-cols-2 gap-4 mb-6">
-              <button onClick={() => handleStartDetox('Social Media')} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left">
-                 <Smartphone className="text-zinc-500 group-hover:text-cyan-400 mb-3 transition-colors" size={28} />
-                 <div className="font-bold text-white">Digital</div>
-                 <div className="text-xs text-zinc-500">Socials & scrolling</div>
-              </button>
-              <button onClick={() => handleStartDetox('Gaming')} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left">
-                 <Gamepad2 className="text-zinc-500 group-hover:text-cyan-400 mb-3 transition-colors" size={28} />
-                 <div className="font-bold text-white">Gaming</div>
-                 <div className="text-xs text-zinc-500">Video games</div>
-              </button>
-              <button onClick={() => handleStartDetox('Shopping')} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left">
-                 <ShoppingBag className="text-zinc-500 group-hover:text-cyan-400 mb-3 transition-colors" size={28} />
-                 <div className="font-bold text-white">Consumer</div>
-                 <div className="text-xs text-zinc-500">Online shopping</div>
-              </button>
-              <button onClick={() => handleStartDetox('Dopamine')} className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left">
-                 <Brain className="text-zinc-500 group-hover:text-cyan-400 mb-3 transition-colors" size={28} />
-                 <div className="font-bold text-white">Total Detox</div>
-                 <div className="text-xs text-zinc-500">No cheap thrills</div>
-              </button>
+          {/* Live Detox */}
+          <button 
+            onClick={() => handleStartDetox('Total')} 
+            className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl hover:bg-zinc-800 hover:border-cyan-500/50 transition-all group text-left mb-8 relative overflow-hidden"
+          >
+             <div className="relative z-10 flex items-center gap-4">
+                <div className="p-4 bg-cyan-500/10 rounded-full text-cyan-400 group-hover:scale-110 transition-transform">
+                    <Brain size={32} />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-white mb-1">Start Total Detox</h3>
+                    <p className="text-zinc-400 text-sm">Block all cheap dopamine sources. Reset your brain.</p>
+                </div>
+             </div>
+             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Zap size={80} className="text-cyan-500" />
+             </div>
+          </button>
+
+          {/* Manual Log */}
+          <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl mb-8">
+             <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                <Clock size={18} className="text-zinc-400" />
+                Log Past Session
+             </h3>
+             
+             <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs text-zinc-500 font-medium uppercase block mb-1.5">Started</label>
+                        <input 
+                            type="datetime-local" 
+                            value={manualDetoxStart}
+                            onChange={(e) => setManualDetoxStart(e.target.value)}
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs text-zinc-500 font-medium uppercase block mb-1.5">Ended</label>
+                        <input 
+                            type="datetime-local" 
+                            value={manualDetoxEnd}
+                            onChange={(e) => setManualDetoxEnd(e.target.value)}
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                        />
+                    </div>
+                </div>
+                
+                <div>
+                    <label className="text-xs text-zinc-500 font-medium uppercase block mb-1.5">Notes</label>
+                    <textarea 
+                        rows="2"
+                        placeholder="How did it feel? What did you do instead?"
+                        value={manualDetoxNote}
+                        onChange={(e) => setManualDetoxNote(e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 resize-none"
+                    />
+                </div>
+
+                <Button 
+                    onClick={handleManualDetoxLog} 
+                    disabled={!manualDetoxStart || !manualDetoxEnd || isSaving}
+                    variant="cyan"
+                    className="w-full py-2 text-sm"
+                >
+                    Log Session
+                </Button>
+             </div>
           </div>
 
           {/* Protocol Card */}
