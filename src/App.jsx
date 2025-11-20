@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, 
-  Minus,
+  Minus, 
   Utensils, 
   Dumbbell, 
   BookOpen, 
@@ -180,15 +180,15 @@ const calculateStreak = (entries) => {
   if (!entries.length) return 0;
   const dates = [...new Set(entries.map(e => new Date(e.timestamp).toDateString()))];
   dates.sort((a, b) => new Date(b) - new Date(a));
-  
+   
   let streak = 0;
   const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86400000).toDateString();
-  
+   
   if (dates[0] !== today && dates[0] !== yesterday) return 0;
 
   let currentDate = new Date(dates[0]);
-  
+   
   for (let i = 0; i < dates.length; i++) {
     const d = new Date(dates[i]);
     const diff = Math.abs(currentDate - d);
@@ -263,7 +263,7 @@ export default function LifeSync() {
     unlockedAchievements: [],
     activeDetox: null 
   });
-  
+   
   // UI State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false); 
@@ -283,14 +283,17 @@ export default function LifeSync() {
   const [entryTime, setEntryTime] = useState('');
   const [tempGoal, setTempGoal] = useState(16); 
 
+  // --- NEW: Workout Builder State ---
+  const [exercises, setExercises] = useState([]); 
+  const [exName, setExName] = useState('');
+  const [exWeight, setExWeight] = useState('');
+  const [exReps, setExReps] = useState('');
+
   // --- Authentication & Initial Setup ---
 
   useEffect(() => {
     const initAuth = async () => {
       try {
-        // Only sign in anonymously if we aren't already logged in (SSO or otherwise)
-        // getAuth().currentUser might be null initially, so we depend on the observer below
-        // But for simplicity in this flow, we attempt anon sign in if strictly no user
         await signInAnonymously(auth);
       } catch (error) {
         console.error("Auth failed:", error);
@@ -298,17 +301,15 @@ export default function LifeSync() {
         setAuthLoading(false);
       }
     };
-    // We only run initAuth if we are sure no one is logged in, or just let onAuthStateChanged handle it.
-    // Ideally, we wait for the first auth state change.
+    
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-        setAuthLoading(false); // Stop loading once we have a user
+        setAuthLoading(false);
         if (currentUser.displayName) {
           setUserSettings(prev => ({ ...prev, displayName: currentUser.displayName }));
         }
       } else {
-        // If no user, trigger anonymous login
         initAuth();
       }
     });
@@ -329,7 +330,6 @@ export default function LifeSync() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      // After signing out of Google, we fall back to being a Guest
       await signInAnonymously(auth);
     } catch (error) {
       console.error("Error signing out", error);
@@ -368,7 +368,7 @@ export default function LifeSync() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000); 
     return () => clearInterval(timer);
   }, []);
-  
+   
   // Cycle Mantras every 30 seconds
   useEffect(() => {
     const timer = setInterval(() => {
@@ -385,13 +385,13 @@ export default function LifeSync() {
 
   const fastingData = useMemo(() => {
     if (!lastMeal) return { hours: 0, minutes: 0, seconds: 0, progress: 0, label: "Start your first fast" };
-    
+     
     const lastMealDate = new Date(lastMeal.timestamp);
     const diffMs = currentTime - lastMealDate;
     const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
     const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     const diffSecs = Math.floor((diffMs % (1000 * 60)) / 1000);
-    
+     
     const goal = userSettings.fastingGoal || 16;
     const progress = Math.min((diffHrs / goal) * 100, 100);
 
@@ -405,7 +405,7 @@ export default function LifeSync() {
 
   const detoxData = useMemo(() => {
     if (!userSettings.activeDetox) return null;
-    
+     
     const startTime = new Date(userSettings.activeDetox.startTime);
     const diffMs = currentTime - startTime;
     const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
@@ -418,9 +418,6 @@ export default function LifeSync() {
   // Bio Phase Logic
   const bioPhase = useMemo(() => {
     const hour = currentTime.getHours();
-    // Phase 1: 7am - 3pm (Deep Work)
-    // Phase 2: 3pm - 11pm (Creative)
-    // Phase 3: 11pm - 7am (Rest)
     
     if (hour >= 7 && hour < 15) return { id: 1, title: "Phase 1", desc: "Deep Work", color: "text-cyan-400 border-cyan-500/30 bg-cyan-500/10" };
     if (hour >= 15 && hour < 23) return { id: 2, title: "Phase 2", desc: "Creative", color: "text-violet-400 border-violet-500/30 bg-violet-500/10" };
@@ -431,7 +428,7 @@ export default function LifeSync() {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     const recentEntries = entries.filter(e => new Date(e.timestamp) > oneWeekAgo);
-    
+     
     const detoxMinutes = recentEntries
       .filter(e => e.type === 'detox')
       .reduce((acc, curr) => acc + (curr.duration || 0), 0);
@@ -451,7 +448,7 @@ export default function LifeSync() {
 
     const currentUnlocked = userSettings.unlockedAchievements || [];
     let newUnlockId = null;
-    
+     
     const updatedUnlocked = [...currentUnlocked];
     let hasUpdates = false;
 
@@ -493,6 +490,8 @@ export default function LifeSync() {
         note,
         tags: tags.split(',').map(t => t.trim()).filter(t => t),
         timestamp: new Date(entryTime).toISOString(),
+        // Save exercises only if workout type
+        ...(modalType === 'workout' && { exercises: exercises }) 
       };
 
       await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'entries'), newEntry);
@@ -502,6 +501,28 @@ export default function LifeSync() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // New Helper: Add exercise to temporary list
+  const addExerciseToSession = () => {
+    if (!exName) return;
+    const newEx = {
+      id: Date.now(), // temp id
+      name: exName,
+      weight: exWeight,
+      reps: exReps
+    };
+    setExercises([...exercises, newEx]);
+    
+    // Reset inputs
+    setExWeight('');
+    setExReps('');
+    setExName(''); 
+  };
+
+  // New Helper: Remove exercise
+  const removeExercise = (id) => {
+    setExercises(exercises.filter(e => e.id !== id));
   };
 
   const handleStartDetox = async (detoxType) => {
@@ -591,6 +612,11 @@ export default function LifeSync() {
     setTags('');
     setEntryTime('');
     setModalType(null);
+    // Clean up workout builder
+    setExercises([]);
+    setExName('');
+    setExWeight('');
+    setExReps('');
   };
 
   const openModal = (type) => {
@@ -619,12 +645,12 @@ export default function LifeSync() {
         <div>
           <h2 className="text-2xl font-bold text-white">Timeline</h2>
           <p className="text-zinc-400 text-sm mb-3">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-          
+           
           {/* Phase Badge */}
           <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${bioPhase.color}`}>
-             <span className="text-[10px] font-bold uppercase tracking-wider">{bioPhase.title}</span>
-             <span className="w-1 h-1 rounded-full bg-current opacity-50"></span>
-             <span className="text-[10px] opacity-90 font-medium">{bioPhase.desc}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">{bioPhase.title}</span>
+              <span className="w-1 h-1 rounded-full bg-current opacity-50"></span>
+              <span className="text-[10px] opacity-90 font-medium">{bioPhase.desc}</span>
           </div>
         </div>
         
@@ -658,7 +684,7 @@ export default function LifeSync() {
               />
               
               <div className="flex justify-between items-start group">
-                <div>
+                <div className="w-full">
                   <span className="text-xs font-mono text-zinc-500 mb-1 block">
                     {new Date(entry.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })} • {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
@@ -668,7 +694,24 @@ export default function LifeSync() {
                        {entry.duration} mins
                     </span>
                   )}
-                  {entry.note && <p className="text-zinc-400 text-sm mt-1 whitespace-pre-wrap">{entry.note}</p>}
+                  
+                  {/* Display Detailed Exercises if present */}
+                  {entry.exercises && entry.exercises.length > 0 && (
+                    <div className="mt-3 bg-zinc-900/50 rounded-xl border border-zinc-800/50 p-3 space-y-2">
+                      {entry.exercises.map((ex, i) => (
+                        <div key={i} className="flex justify-between items-center text-sm">
+                          <span className="text-zinc-300 font-medium">{ex.name}</span>
+                          <span className="text-zinc-500 font-mono text-xs">
+                            {ex.weight ? `${ex.weight}lbs` : ''} 
+                            {ex.weight && ex.reps ? ' x ' : ''}
+                            {ex.reps ? `${ex.reps} reps` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {entry.note && <p className="text-zinc-400 text-sm mt-2 whitespace-pre-wrap">{entry.note}</p>}
                   {entry.tags && entry.tags.length > 0 && (
                     <div className="flex gap-2 mt-3">
                       {entry.tags.map((tag, i) => (
@@ -679,7 +722,7 @@ export default function LifeSync() {
                 </div>
                 <button 
                   onClick={() => handleDelete(entry.id)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-zinc-600 hover:text-red-400"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-zinc-600 hover:text-red-400 ml-2"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -1204,7 +1247,7 @@ export default function LifeSync() {
 
     const config = {
       meal: { icon: Utensils, color: 'text-orange-400', label: 'Log Meal', placeholder: 'Oatmeal & Berries' },
-      workout: { icon: Dumbbell, color: 'text-emerald-400', label: 'Log Workout', placeholder: '30min Run' },
+      workout: { icon: Dumbbell, color: 'text-emerald-400', label: 'Log Workout', placeholder: 'Session Title (e.g. Leg Day)' },
       journal: { icon: BookOpen, color: 'text-violet-400', label: 'Log Journal', placeholder: 'Feeling energetic today...' },
     };
     
@@ -1213,7 +1256,9 @@ export default function LifeSync() {
 
     return (
       <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-        <div className="bg-zinc-900 w-full max-w-md rounded-3xl border border-zinc-800 p-6 animate-slide-up shadow-2xl">
+        <div className="bg-zinc-900 w-full max-w-md rounded-3xl border border-zinc-800 p-6 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto">
+          
+          {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
               <div className={`p-3 rounded-xl bg-zinc-800 ${currentConfig.color}`}>
@@ -1227,6 +1272,7 @@ export default function LifeSync() {
           </div>
 
           <div className="space-y-4">
+             {/* Time Input */}
              <div>
                <label className="text-xs text-zinc-500 font-medium uppercase tracking-wider ml-1 mb-1 block">Time</label>
                <div className="relative">
@@ -1240,8 +1286,11 @@ export default function LifeSync() {
                </div>
             </div>
 
+            {/* Title Input */}
             <div>
-              <label className="text-xs text-zinc-500 font-medium uppercase tracking-wider ml-1 mb-1 block">Title</label>
+              <label className="text-xs text-zinc-500 font-medium uppercase tracking-wider ml-1 mb-1 block">
+                {modalType === 'workout' ? 'Session Title' : 'Title'}
+              </label>
               <input
                 autoFocus
                 type="text"
@@ -1252,11 +1301,86 @@ export default function LifeSync() {
               />
             </div>
 
+            {/* --- WORKOUT BUILDER SECTION --- */}
+            {modalType === 'workout' && (
+              <div className="bg-zinc-950/50 rounded-xl border border-zinc-800 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-emerald-400 mb-2">
+                  <TrendingUp size={16} />
+                  <span className="text-sm font-bold uppercase tracking-wider">Exercise Builder</span>
+                </div>
+                
+                {/* Inputs */}
+                <div className="grid grid-cols-12 gap-2">
+                  <div className="col-span-12">
+                    <input
+                      type="text"
+                      placeholder="Exercise Name (e.g. Bench Press)"
+                      value={exName}
+                      onChange={(e) => setExName(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none"
+                    />
+                  </div>
+                  <div className="col-span-5">
+                    <input
+                      type="number"
+                      placeholder="Weight"
+                      value={exWeight}
+                      onChange={(e) => setExWeight(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none"
+                    />
+                  </div>
+                  <div className="col-span-5">
+                    <input
+                      type="number"
+                      placeholder="Reps"
+                      value={exReps}
+                      onChange={(e) => setExReps(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <button 
+                      onClick={addExerciseToSession}
+                      disabled={!exName}
+                      className="w-full h-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 rounded-lg flex items-center justify-center hover:bg-emerald-500 hover:text-zinc-950 transition-colors disabled:opacity-50"
+                    >
+                      <Plus size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* List of added exercises */}
+                {exercises.length > 0 && (
+                  <div className="mt-3 space-y-2 max-h-40 overflow-y-auto pr-1">
+                    {exercises.map((ex, i) => (
+                      <div key={ex.id} className="flex items-center justify-between bg-zinc-900 p-2 rounded border border-zinc-800/50 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-zinc-500 font-mono text-xs w-4">{i + 1}.</span>
+                          <span className="text-zinc-200 font-medium">{ex.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-zinc-400 text-xs">
+                            {ex.weight && <span className="text-zinc-300">{ex.weight}lbs</span>}
+                            {ex.weight && ex.reps && <span className="mx-1">x</span>}
+                            {ex.reps && <span className="text-emerald-400">{ex.reps}</span>}
+                          </div>
+                          <button onClick={() => removeExercise(ex.id)} className="text-zinc-600 hover:text-red-400">
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Notes (Standard) */}
             <div>
               <label className="text-xs text-zinc-500 font-medium uppercase tracking-wider ml-1 mb-1 block">Notes</label>
               <textarea
                 rows="3"
-                placeholder="Add details..."
+                placeholder="How did it feel?"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors resize-none"
