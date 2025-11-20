@@ -75,19 +75,19 @@ import {
 
 // --- Firebase Initialization ---
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: "AIzaSyBODxsazcWZiANa_3eTjPL3ZZNVMdnaDvQ",
+  authDomain: "lifesync-91884.firebaseapp.com",
+  projectId: "lifesync-91884",
+  storageBucket: "lifesync-91884.firebasestorage.app",
+  messagingSenderId: "481070215124",
+  appId: "1:481070215124:web:4a6c1185bbd77099cbf041"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const appId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'lifesync-local';
+const appId = 'lifesync-91884';
 
 // --- Constants & Data ---
 
@@ -267,13 +267,7 @@ const TimelineEntry = ({ entry, onDelete }) => {
         <div className="flex justify-between items-start">
            <div className="flex-1 pr-4">
              <span className="text-xs font-mono text-zinc-500 mb-1 block">
-               {(() => { 
-                 const d = new Date(entry.timestamp);
-                 const t = d.getTime();
-                 return Number.isNaN(t) 
-                   ? '--:--' 
-                   : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-               })()}
+               {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
              </span>
              <h3 className="text-lg font-semibold text-zinc-200 group-hover:text-white transition-colors flex items-center gap-2">
                 {entry.title}
@@ -499,30 +493,11 @@ export default function LifeSync() {
     if (!user) return;
     const q = collection(db, 'artifacts', appId, 'users', user.uid, 'entries');
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedEntries = snapshot.docs.map(doc => {
-        const data = doc.data();
-        let ts = data.timestamp;
-        if (ts && typeof ts === 'object' && typeof ts.toDate === 'function') {
-          try {
-            ts = ts.toDate().toISOString();
-          } catch (_) {
-            ts = undefined;
-          }
-        }
-        return {
-          id: doc.id,
-          ...data,
-          ...(ts ? { timestamp: ts } : {})
-        };
-      });
-      fetchedEntries.sort((a, b) => {
-        const tb = new Date(b.timestamp).getTime();
-        const ta = new Date(a.timestamp).getTime();
-        if (Number.isNaN(tb) && Number.isNaN(ta)) return 0;
-        if (Number.isNaN(tb)) return 1;
-        if (Number.isNaN(ta)) return -1;
-        return tb - ta;
-      });
+      const fetchedEntries = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      fetchedEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
       setEntries(fetchedEntries);
     }, (error) => console.error("Error fetching entries:", error));
     return () => unsubscribe();
@@ -591,30 +566,25 @@ export default function LifeSync() {
 
   const fastingData = useMemo(() => {
     if (!lastMeal) return { hours: 0, minutes: 0, seconds: 0, progress: 0, label: "Start your first fast" };
-    
+      
     const lastMealDate = new Date(lastMeal.timestamp);
     const diffMs = currentTime - lastMealDate;
-    const safeMs = Number.isFinite(diffMs) && diffMs > 0 ? diffMs : 0;
+    // Protect against future dates causing negative
+    const safeDiffMs = Math.max(0, diffMs); 
 
-    const diffHrs = Math.floor(safeMs / (1000 * 60 * 60));
-    const diffMins = Math.floor((safeMs % (1000 * 60 * 60)) / (1000 * 60));
-    const diffSecs = Math.floor((safeMs % (1000 * 60)) / 1000);
-
+    const diffHrs = Math.floor(safeDiffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor((safeDiffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const diffSecs = Math.floor((safeDiffMs % (1000 * 60)) / 1000);
+      
     const goal = userSettings.fastingGoal > 0 ? userSettings.fastingGoal : 16;
-    const progress = Math.min(((Number.isFinite(diffHrs) ? diffHrs : 0) / goal) * 100, 100);
+    const progress = Math.min((diffHrs / goal) * 100, 100);
 
     let label = "Fat Burning Zone";
-    if (Number.isFinite(diffHrs) && diffHrs < 4) label = "Digesting";
-    else if (Number.isFinite(diffHrs) && diffHrs < 12) label = "Normal State";
-    else if (Number.isFinite(diffHrs) && diffHrs > 18) label = "Autophagy";
+    if (diffHrs < 4) label = "Digesting";
+    else if (diffHrs < 12) label = "Normal State";
+    else if (diffHrs > 18) label = "Autophagy";
 
-    return { 
-      hours: Number.isFinite(diffHrs) ? diffHrs : 0, 
-      minutes: Number.isFinite(diffMins) ? diffMins : 0, 
-      seconds: Number.isFinite(diffSecs) ? diffSecs : 0, 
-      progress, 
-      label 
-    };
+    return { hours: diffHrs, minutes: diffMins, seconds: diffSecs, progress, label };
   }, [lastMeal, currentTime, userSettings.fastingGoal]);
 
   const detoxData = useMemo(() => {
@@ -1051,23 +1021,23 @@ export default function LifeSync() {
         <div>
           <h2 className="text-2xl font-bold text-white">Timeline</h2>
           <p className="text-zinc-400 text-sm mb-3">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-          <div className="flex flex-wrap gap-2">
-            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${bioPhase.color}`}>
-                <span className="text-[10px] font-bold uppercase tracking-wider">{bioPhase.title}</span>
-                <span className="w-1 h-1 rounded-full bg-current opacity-50"></span>
-                <span className="text-[10px] opacity-90 font-medium">{bioPhase.desc}</span>
-            </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-800 bg-zinc-900/50 text-zinc-400">
-                <Clock size={12} />
-                <span className="text-[10px] font-bold font-mono">
-                  {fastingData?.hours || 0}:{(fastingData?.minutes || 0).toString().padStart(2, '0')}
-                </span>
-                <span className="w-1 h-1 rounded-full bg-zinc-600"></span>
-                <span className="text-[10px] font-medium text-emerald-400">{fastingData?.label || 'Ready'}</span>
-            </div>
+          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${bioPhase.color}`}>
+              <span className="text-[10px] font-bold uppercase tracking-wider">{bioPhase.title}</span>
+              <span className="w-1 h-1 rounded-full bg-current opacity-50"></span>
+              <span className="text-[10px] opacity-90 font-medium">{bioPhase.desc}</span>
           </div>
         </div>
         
+        <div onClick={() => setActiveTab('profile')} className="cursor-pointer flex items-center gap-2 bg-zinc-900/50 p-1 pr-3 rounded-full border border-zinc-800 hover:bg-zinc-800 transition-colors">
+          <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700 overflow-hidden">
+            {user?.photoURL ? (
+               <img src={user.photoURL} alt="User" className="w-full h-full object-cover" />
+            ) : (
+               <span className="text-xs font-bold text-emerald-500">{userSettings.displayName.charAt(0).toUpperCase()}</span>
+            )}
+          </div>
+          <span className="text-xs font-medium text-zinc-300 max-w-[60px] truncate">{userSettings.displayName.split(' ')[0]}</span>
+        </div>
       </div>
 
       {entries.length === 0 ? (
@@ -1142,13 +1112,7 @@ export default function LifeSync() {
           <Card className="text-center py-4">
             <div className="text-zinc-500 text-xs mb-1">Last Meal</div>
             <div className="text-zinc-200 font-medium">
-              {(() => {
-                if (!lastMeal) return '--:--';
-                const d = new Date(lastMeal.timestamp);
-                return Number.isNaN(d.getTime()) 
-                  ? '--:--' 
-                  : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-              })()}
+              {lastMeal ? new Date(lastMeal.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}
             </div>
           </Card>
           
@@ -1177,7 +1141,7 @@ export default function LifeSync() {
      const todayIndex = new Date().getDay();
      const todayStr = new Date().toISOString().split('T')[0];
      
-     const todaysRoutines = routines.filter(r => (Array.isArray(r.days) ? r.days : [0,1,2,3,4,5,6]).includes(todayIndex));
+     const todaysRoutines = routines.filter(r => r.days.includes(todayIndex));
      
      todaysRoutines.sort((a, b) => {
         const aDone = (a.completedDates || []).includes(todayStr);
@@ -1220,9 +1184,6 @@ export default function LifeSync() {
                       exercise: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
                       mindset: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10'
                    };
-                   const typeKey = (routine && (routine.type === 'diet' || routine.type === 'exercise' || routine.type === 'mindset')) ? routine.type : 'mindset';
-                   const colorClasses = colors[typeKey];
-                   const iconColor = (colorClasses.split(' ')[0] || 'text-zinc-600');
                    
                    return (
                       <div 
@@ -1231,7 +1192,7 @@ export default function LifeSync() {
                         className={`relative flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer group
                            ${isCompleted ? 'bg-zinc-900/30 border-zinc-800 opacity-60' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`}
                       >
-                          <div className={`${isCompleted ? 'text-zinc-600' : iconColor}`}>
+                          <div className={`${isCompleted ? 'text-zinc-600' : colors[routine.type].split(' ')[0]}`}>
                             {isCompleted ? <CheckCircle size={24} /> : <Circle size={24} />}
                           </div>
                           
@@ -1240,8 +1201,8 @@ export default function LifeSync() {
                                {routine.title}
                              </div>
                              <div className="flex gap-2 mt-1">
-                               <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${colorClasses}`}>
-                                 {typeKey}
+                               <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${colors[routine.type]}`}>
+                                 {routine.type}
                                </span>
                              </div>
                           </div>
@@ -2149,16 +2110,7 @@ export default function LifeSync() {
             <div className="w-2 h-8 bg-emerald-500 rounded-full"></div>
             <h1 className="text-xl font-bold tracking-tight text-white">LifeSync</h1>
           </div>
-          <div onClick={() => setActiveTab('profile')} className="cursor-pointer flex items-center gap-2 bg-zinc-900/50 p-1 pr-3 rounded-full border border-zinc-800 hover:bg-zinc-800 transition-colors">
-            <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700 overflow-hidden">
-              {user?.photoURL ? (
-                 <img src={user.photoURL} alt="User" className="w-full h-full object-cover" />
-              ) : (
-                 <span className="text-xs font-bold text-emerald-500">{userSettings.displayName.charAt(0).toUpperCase()}</span>
-              )}
-            </div>
-            <span className="text-xs font-medium text-zinc-300 max-w-[60px] truncate">{userSettings.displayName.split(' ')[0]}</span>
-          </div> 
+          <div className="w-8"></div> 
         </header>
 
         {/* Content */}
