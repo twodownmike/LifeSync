@@ -33,7 +33,9 @@ import {
   Coffee,
   Shield,
   Scroll,
-  Sun
+  Sun,
+  LogOut,
+  LogIn
 } from 'lucide-react';
 
 // --- Firebase Imports ---
@@ -43,6 +45,9 @@ import {
   signInWithCustomToken, 
   signInAnonymously, 
   onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -256,7 +261,7 @@ export default function LifeSync() {
     displayName: 'Guest', 
     fastingGoal: 16,
     unlockedAchievements: [],
-    activeDetox: null // { type: 'social', startTime: ISOString }
+    activeDetox: null 
   });
   
   // UI State
@@ -283,6 +288,9 @@ export default function LifeSync() {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        // Only sign in anonymously if we aren't already logged in (SSO or otherwise)
+        // getAuth().currentUser might be null initially, so we depend on the observer below
+        // But for simplicity in this flow, we attempt anon sign in if strictly no user
         await signInAnonymously(auth);
       } catch (error) {
         console.error("Auth failed:", error);
@@ -290,16 +298,43 @@ export default function LifeSync() {
         setAuthLoading(false);
       }
     };
-    initAuth();
-
+    // We only run initAuth if we are sure no one is logged in, or just let onAuthStateChanged handle it.
+    // Ideally, we wait for the first auth state change.
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser?.displayName) {
-        setUserSettings(prev => ({ ...prev, displayName: currentUser.displayName }));
+      if (currentUser) {
+        setUser(currentUser);
+        setAuthLoading(false); // Stop loading once we have a user
+        if (currentUser.displayName) {
+          setUserSettings(prev => ({ ...prev, displayName: currentUser.displayName }));
+        }
+      } else {
+        // If no user, trigger anonymous login
+        initAuth();
       }
     });
     return () => unsubscribe();
   }, []);
+
+  // --- Google Auth Actions ---
+  const handleGoogleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Error signing in with Google", error);
+      alert("Could not sign in. Did you enable Google Auth in Firebase Console?");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      // After signing out of Google, we fall back to being a Guest
+      await signInAnonymously(auth);
+    } catch (error) {
+      console.error("Error signing out", error);
+    }
+  };
 
   // --- Data Fetching (Firestore) ---
 
@@ -885,9 +920,28 @@ export default function LifeSync() {
         </div>
         <div>
           <h3 className="text-xl font-bold text-white">{userSettings.displayName}</h3>
-          <p className="text-emerald-400 text-sm flex items-center gap-1">
-            {user?.isAnonymous ? "Guest Account" : "Logged in"}
+          <p className="text-emerald-400 text-sm flex items-center gap-1 mb-1">
+            {user?.isAnonymous ? "Guest Account" : "Logged in with Google"}
           </p>
+          
+          {/* Auth Buttons */}
+          {user?.isAnonymous ? (
+            <button 
+              onClick={handleGoogleSignIn}
+              className="flex items-center gap-2 text-xs bg-white text-black px-3 py-1.5 rounded-full font-bold hover:bg-gray-200 transition-colors"
+            >
+              <LogIn size={12} />
+              Sign in with Google
+            </button>
+          ) : (
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-xs bg-zinc-800 text-zinc-300 px-3 py-1.5 rounded-full font-medium hover:bg-zinc-700 transition-colors"
+            >
+              <LogOut size={12} />
+              Sign Out
+            </button>
+          )}
         </div>
       </div>
 
