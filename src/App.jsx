@@ -43,7 +43,10 @@ import {
   Send,      
   MessageSquare,
   ChevronDown,
-  RefreshCw // Added for clear chat
+  RefreshCw,
+  ListChecks, // Added for Routine tab
+  CheckCircle,
+  Circle
 } from 'lucide-react';
 
 // --- Firebase Imports ---
@@ -65,6 +68,7 @@ import {
   doc, 
   onSnapshot, 
   setDoc,
+  updateDoc,
   query,     
   orderBy,   
   limit      
@@ -391,16 +395,18 @@ export default function LifeSync() {
   const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
   const [entries, setEntries] = useState([]);
+  const [routines, setRoutines] = useState([]); // New State for Routines
   const [userSettings, setUserSettings] = useState({ 
     displayName: 'Guest', 
     fastingGoal: 16,
     fitnessGoal: '',
+    dietGoal: '', // New field
     dietaryPreferences: '',
     unlockedAchievements: [],
     activeDetox: null 
   });
   
-  // API Key Management (LocalStorage for security)
+  // API Key Management
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('lifesync_openai_key') || '');
   const [showApiKey, setShowApiKey] = useState(false);
   
@@ -410,6 +416,7 @@ export default function LifeSync() {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false); 
   const [isManifestoOpen, setIsManifestoOpen] = useState(false); 
+  const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false); // New
   const [modalType, setModalType] = useState(null); 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isSaving, setIsSaving] = useState(false);
@@ -434,6 +441,11 @@ export default function LifeSync() {
   const [exName, setExName] = useState('');
   const [exWeight, setExWeight] = useState('');
   const [exReps, setExReps] = useState('');
+
+  // Routine Builder State
+  const [routineTitle, setRoutineTitle] = useState('');
+  const [routineType, setRoutineType] = useState('mindset');
+  const [routineDays, setRoutineDays] = useState([]); // Array of day indexes 0-6
 
   // --- Authentication & Initial Setup ---
 
@@ -526,6 +538,20 @@ export default function LifeSync() {
           chatEndRef.current.scrollIntoView({ behavior: "smooth" });
         }
       }, 100);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  // Fetch Routines
+  useEffect(() => {
+    if (!user) return;
+    const q = collection(db, 'artifacts', appId, 'users', user.uid, 'routines');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedRoutines = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setRoutines(fetchedRoutines);
     });
     return () => unsubscribe();
   }, [user]);
@@ -666,6 +692,60 @@ export default function LifeSync() {
     }
   };
 
+  const handleCreateRoutine = async () => {
+    if (!user || !routineTitle) return;
+    setIsSaving(true);
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'routines'), {
+        title: routineTitle,
+        type: routineType,
+        days: routineDays.length > 0 ? routineDays : [0,1,2,3,4,5,6], // default daily
+        completedDates: []
+      });
+      setIsRoutineModalOpen(false);
+      setRoutineTitle('');
+      setRoutineDays([]);
+      setRoutineType('mindset');
+    } catch (err) {
+      console.error("Error creating routine:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleToggleRoutine = async (routineId, isCompleted) => {
+     if (!user) return;
+     const today = new Date().toISOString().split('T')[0];
+     
+     // Optimistic UI update is hard with Firestore directly, so we rely on realtime listener
+     // Find the routine to get current state
+     const routine = routines.find(r => r.id === routineId);
+     if (!routine) return;
+     
+     let newDates = routine.completedDates || [];
+     if (isCompleted) {
+        newDates = newDates.filter(d => d !== today);
+     } else {
+        newDates.push(today);
+     }
+
+     try {
+       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'routines', routineId), {
+         completedDates: newDates
+       });
+     } catch(err) {
+       console.error("Error updating routine:", err);
+     }
+  };
+
+  const handleDeleteRoutine = async (id) => {
+     if (!user) return;
+     if (!window.confirm("Delete this routine?")) return;
+     try {
+       await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'routines', id));
+     } catch (err) { console.error(err); }
+  };
+
   const addExerciseToSession = () => {
     if (!exName) return;
     const newEx = {
@@ -802,8 +882,6 @@ export default function LifeSync() {
     if (!window.confirm("Clear your conversation history?")) return;
     
     try {
-      // We'll just delete the local state to "clear" it visually for the user immediately
-      // and then delete from firestore.
       const msgsToDelete = [...coachMessages];
       setCoachMessages([]); // Optimistic update
       
@@ -828,14 +906,12 @@ export default function LifeSync() {
     setCoachLoading(true);
 
     try {
-        // 1. Save User Message
         await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'coach_messages'), {
             role: 'user',
             content: textInput,
             createdAt: new Date().toISOString()
         });
 
-        // 2. Build Rich Context from Logs
         const allMeals = entries.filter(e => e.type === 'meal').map(e => 
             `- ${new Date(e.timestamp).toLocaleDateString()} ${new Date(e.timestamp).toLocaleTimeString()}: ${e.title} (${e.note || ''})`
         ).join('\n');
@@ -856,7 +932,6 @@ export default function LifeSync() {
         - Last Meal: ${lastMeal ? new Date(lastMeal.timestamp).toLocaleString() : 'None recorded'}
         `;
 
-        // Include Dopamine Protocol in Prompt
         const protocolContext = PRINCIPLES.map(p => `- ${p.title}: ${p.text}`).join('\n');
 
         const systemPrompt = `
@@ -864,12 +939,13 @@ export default function LifeSync() {
           
           USER PROFILE:
           - Name: ${userSettings.displayName}
-          - Goal: ${userSettings.fitnessGoal || 'General Health'}
-          - Diet: ${userSettings.dietaryPreferences || 'Balanced'}
+          - Fitness Goal: ${userSettings.fitnessGoal || 'General Health'}
+          - Diet Goal: ${userSettings.dietGoal || 'Eat Healthy'}
+          - Dietary Prefs: ${userSettings.dietaryPreferences || 'Balanced'}
           - Current Time: ${currentTime.toLocaleString()}
           - Bio Phase: ${bioPhase.title} (${bioPhase.desc})
           
-          DOPAMINE PROTOCOL PRINCIPLES (Always align advice with these):
+          DOPAMINE PROTOCOL PRINCIPLES:
           ${protocolContext}
 
           FASTING DATA:
@@ -887,11 +963,9 @@ export default function LifeSync() {
 
           Respond with a concise, punchy, markdown formatted plan or answer. 
           Use ### for headers and ** for bold. Keep it actionable.
-          Be context aware of their past workouts and meals to suggest progressions or dietary adjustments.
-          If suggesting breaks or lifestyle changes, reference the Dopamine Protocol principles.
+          Always consider the specific Fitness and Diet Goals provided.
         `;
 
-        // 3. Include Full Chat History
         const history = coachMessages.map(m => ({ role: m.role, content: m.content }));
 
         const apiMessages = [
@@ -916,7 +990,6 @@ export default function LifeSync() {
         const data = await response.json();
         if (data.error) throw new Error(data.error.message);
 
-        // 4. Save AI Response
         await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'coach_messages'), {
             role: 'assistant',
             content: data.choices[0].message.content,
@@ -975,6 +1048,159 @@ export default function LifeSync() {
       )}
     </div>
   );
+
+  const renderRoutine = () => {
+     const todayIndex = new Date().getDay();
+     const todayStr = new Date().toISOString().split('T')[0];
+     
+     // Filter routines for today
+     const todaysRoutines = routines.filter(r => r.days.includes(todayIndex));
+     
+     // Sort: Not completed first
+     todaysRoutines.sort((a, b) => {
+        const aDone = (a.completedDates || []).includes(todayStr);
+        const bDone = (b.completedDates || []).includes(todayStr);
+        if (aDone === bDone) return 0;
+        return aDone ? 1 : -1;
+     });
+
+     const toggleDay = (dayIdx) => {
+        if (routineDays.includes(dayIdx)) {
+           setRoutineDays(routineDays.filter(d => d !== dayIdx));
+        } else {
+           setRoutineDays([...routineDays, dayIdx].sort());
+        }
+     };
+
+     return (
+       <div className="flex flex-col h-full pb-24 animate-fade-in">
+          <div className="flex justify-between items-center mb-6">
+             <h2 className="text-2xl font-bold text-white">Daily Checklist</h2>
+             <button onClick={() => setIsRoutineModalOpen(true)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-700">
+               <Plus size={20} />
+             </button>
+          </div>
+
+          {todaysRoutines.length === 0 ? (
+             <div className="text-center py-12 opacity-50">
+                <ListChecks size={48} className="mx-auto mb-4 text-zinc-600" />
+                <p className="text-zinc-400 text-sm">No tasks scheduled for today.</p>
+                <button onClick={() => setIsRoutineModalOpen(true)} className="mt-4 text-violet-400 text-sm font-bold hover:underline">
+                  Create a Routine
+                </button>
+             </div>
+          ) : (
+             <div className="space-y-3">
+                {todaysRoutines.map(routine => {
+                   const isCompleted = (routine.completedDates || []).includes(todayStr);
+                   const colors = {
+                      diet: 'text-orange-400 border-orange-500/30 bg-orange-500/10',
+                      exercise: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
+                      mindset: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10'
+                   };
+                   
+                   return (
+                      <div 
+                        key={routine.id}
+                        onClick={() => handleToggleRoutine(routine.id, isCompleted)}
+                        className={`relative flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer group
+                           ${isCompleted ? 'bg-zinc-900/30 border-zinc-800 opacity-60' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`}
+                      >
+                         <div className={`${isCompleted ? 'text-zinc-600' : colors[routine.type].split(' ')[0]}`}>
+                            {isCompleted ? <CheckCircle size={24} /> : <Circle size={24} />}
+                         </div>
+                         
+                         <div className="flex-1">
+                            <div className={`font-medium ${isCompleted ? 'text-zinc-500 line-through' : 'text-zinc-200'}`}>
+                              {routine.title}
+                            </div>
+                            <div className="flex gap-2 mt-1">
+                               <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${colors[routine.type]}`}>
+                                 {routine.type}
+                               </span>
+                            </div>
+                         </div>
+
+                         <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeleteRoutine(routine.id); }}
+                            className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-all"
+                         >
+                            <Trash2 size={16} />
+                         </button>
+                      </div>
+                   )
+                })}
+             </div>
+          )}
+
+          {/* Create Routine Modal */}
+          {isRoutineModalOpen && (
+             <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+                <div className="bg-zinc-900 w-full max-w-sm rounded-3xl border border-zinc-800 p-6 animate-slide-up shadow-2xl">
+                   <h3 className="text-lg font-bold text-white mb-4">New Recurring Task</h3>
+                   
+                   <div className="space-y-4">
+                      <div>
+                         <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Task Name</label>
+                         <input 
+                           type="text" 
+                           placeholder="e.g. Morning Journal" 
+                           value={routineTitle}
+                           onChange={(e) => setRoutineTitle(e.target.value)}
+                           className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500"
+                         />
+                      </div>
+
+                      <div>
+                         <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Category</label>
+                         <div className="grid grid-cols-3 gap-2">
+                            {['diet', 'exercise', 'mindset'].map(t => (
+                               <button
+                                 key={t}
+                                 onClick={() => setRoutineType(t)}
+                                 className={`py-2 rounded-lg text-xs font-bold uppercase transition-colors border
+                                   ${routineType === t 
+                                      ? 'bg-zinc-800 text-white border-zinc-600' 
+                                      : 'bg-zinc-950 text-zinc-500 border-zinc-800 hover:border-zinc-700'}`}
+                               >
+                                 {t}
+                               </button>
+                            ))}
+                         </div>
+                      </div>
+
+                      <div>
+                         <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Days of Week</label>
+                         <div className="flex justify-between gap-1">
+                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                               <button
+                                 key={i}
+                                 onClick={() => toggleDay(i)}
+                                 className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-all
+                                   ${routineDays.includes(i) 
+                                      ? 'bg-violet-600 text-white' 
+                                      : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700'}`}
+                               >
+                                 {d}
+                               </button>
+                            ))}
+                         </div>
+                         <p className="text-[10px] text-zinc-500 mt-2 text-center">
+                            {routineDays.length === 0 ? "Select days or leave empty for Daily" : ""}
+                         </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mt-6">
+                         <Button variant="ghost" onClick={() => setIsRoutineModalOpen(false)} className="bg-zinc-800 text-zinc-400 hover:bg-zinc-700">Cancel</Button>
+                         <Button onClick={handleCreateRoutine} disabled={isSaving || !routineTitle}>Create</Button>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          )}
+       </div>
+     )
+  }
 
   const renderCoach = () => {
     const quickActions = [
@@ -1236,78 +1462,6 @@ export default function LifeSync() {
      )
   }
 
-  const renderFasting = () => (
-    <div className="flex flex-col items-center justify-center h-full pb-20 animate-fade-in relative">
-      <div className="absolute top-0 right-0">
-        <button 
-          onClick={() => setIsInfoModalOpen(true)}
-          className="text-zinc-500 hover:text-emerald-400 transition-colors p-2"
-        >
-          <Info size={22} />
-        </button>
-      </div>
-
-      <div className="relative w-64 h-64 flex items-center justify-center mb-8">
-        <div className="absolute inset-0 rounded-full border-8 border-zinc-800"></div>
-        <svg className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-          <circle
-            cx="128"
-            cy="128"
-            r="120"
-            stroke="currentColor"
-            strokeWidth="8"
-            fill="transparent"
-            className="text-emerald-500 transition-all duration-1000 ease-linear" 
-            strokeDasharray={2 * Math.PI * 120}
-            strokeDashoffset={2 * Math.PI * 120 * (1 - fastingData.progress / 100)}
-            strokeLinecap="round"
-          />
-        </svg>
-        
-        <div className="text-center z-10 flex flex-col items-center">
-          <div className="text-zinc-400 text-sm font-medium mb-2">Current Fast</div>
-          <div className="text-5xl font-bold text-white font-mono tracking-tighter flex items-baseline">
-            <span>{fastingData.hours}</span>
-            <span className="mx-1">:</span>
-            <span>{fastingData.minutes.toString().padStart(2, '0')}</span>
-          </div>
-          <div className="text-2xl font-mono text-zinc-500 mt-1 font-bold">
-             {fastingData.seconds.toString().padStart(2, '0')}
-          </div>
-          <div className="text-emerald-400 text-xs font-bold uppercase tracking-widest mt-3">
-            {fastingData.label}
-          </div>
-        </div>
-      </div>
-
-      <div className="w-full max-w-xs grid grid-cols-2 gap-4">
-        <Card className="text-center py-4">
-          <div className="text-zinc-500 text-xs mb-1">Last Meal</div>
-          <div className="text-zinc-200 font-medium">
-            {lastMeal ? new Date(lastMeal.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}
-          </div>
-        </Card>
-        
-        <Card 
-          onClick={openGoalModal}
-          className="text-center py-4 cursor-pointer hover:bg-zinc-800/50 transition-colors relative group"
-        >
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500">
-             <Edit2 size={12} />
-          </div>
-          <div className="text-zinc-500 text-xs mb-1">Goal</div>
-          <div className="text-zinc-200 font-medium">{userSettings.fastingGoal} Hours</div>
-        </Card>
-      </div>
-
-      {fastingData.hours >= userSettings.fastingGoal && (
-        <div className="mt-8 bg-emerald-500/10 text-emerald-400 px-4 py-2 rounded-full text-sm font-medium animate-pulse">
-          Target Reached!
-        </div>
-      )}
-    </div>
-  );
-
   const renderProfile = () => (
     <div className="space-y-6 pb-24 animate-fade-in">
       <div className="flex items-center justify-between mb-6">
@@ -1353,43 +1507,13 @@ export default function LifeSync() {
       </div>
 
       <div className="space-y-6">
-        {/* Trophy Cabinet */}
-        <div>
-          <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-             <Trophy className="text-yellow-500" size={20} />
-             Achievements
-          </h3>
-          <div className="grid grid-cols-3 gap-3">
-            {ACHIEVEMENTS.map((ach) => {
-               const isUnlocked = (userSettings.unlockedAchievements || []).includes(ach.id);
-               const Icon = ach.icon;
-               const tierColors = {
-                 bronze: 'text-orange-400 border-orange-500/30 bg-orange-500/10',
-                 silver: 'text-zinc-300 border-zinc-400/30 bg-zinc-400/10',
-                 gold: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10'
-               };
-               
-               return (
-                 <div key={ach.id} className={`flex flex-col items-center p-3 rounded-2xl border text-center transition-all
-                    ${isUnlocked ? `${tierColors[ach.tier]}` : 'border-zinc-800 bg-zinc-900/50 opacity-50 grayscale'}`}>
-                    <div className="mb-2">
-                       <Icon size={24} />
-                    </div>
-                    <div className="text-[10px] font-bold uppercase tracking-wider opacity-80 mb-1">{ach.title}</div>
-                    {isUnlocked && <div className="text-[9px] leading-tight opacity-70 hidden sm:block">{ach.desc}</div>}
-                 </div>
-               )
-            })}
-          </div>
-        </div>
-
         <Card>
           <div className="flex items-center gap-3 mb-4 text-emerald-400">
             <Settings size={20} />
             <h3 className="font-bold text-white">Settings</h3>
           </div>
           
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
               <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Display Name</label>
               <input 
@@ -1400,7 +1524,41 @@ export default function LifeSync() {
               />
             </div>
 
+            <div className="grid grid-cols-1 gap-4">
+               <div>
+                  <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Fitness Goal</label>
+                  <textarea 
+                    rows="3"
+                    placeholder="e.g. Build muscle, hit 225lb bench, run a 5k"
+                    value={userSettings.fitnessGoal || ''}
+                    onChange={(e) => setUserSettings({...userSettings, fitnessGoal: e.target.value})}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 resize-none"
+                  />
+               </div>
+               
+               <div>
+                  <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Diet Goal</label>
+                  <textarea 
+                    rows="3"
+                    placeholder="e.g. Eat 180g protein, stay under 2500 cals"
+                    value={userSettings.dietGoal || ''}
+                    onChange={(e) => setUserSettings({...userSettings, dietGoal: e.target.value})}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 resize-none"
+                  />
+               </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Dietary Preferences</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Keto, Vegan"
+                  value={userSettings.dietaryPreferences || ''}
+                  onChange={(e) => setUserSettings({...userSettings, dietaryPreferences: e.target.value})}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
               <div>
                 <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Fasting Goal (h)</label>
                 <input 
@@ -1410,27 +1568,6 @@ export default function LifeSync() {
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
-              <div>
-                <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Fitness Goal</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Bulking"
-                  value={userSettings.fitnessGoal || ''}
-                  onChange={(e) => setUserSettings({...userSettings, fitnessGoal: e.target.value})}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Dietary Preferences</label>
-              <input 
-                type="text" 
-                placeholder="e.g. Keto, Vegan, None"
-                value={userSettings.dietaryPreferences || ''}
-                onChange={(e) => setUserSettings({...userSettings, dietaryPreferences: e.target.value})}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
-              />
             </div>
 
             <div className="pt-4 border-t border-zinc-800 mt-2">
@@ -1856,6 +1993,7 @@ export default function LifeSync() {
           {activeTab === 'fasting' && renderFasting()}
           {activeTab === 'coach' && renderCoach()}
           {activeTab === 'detox' && renderDetox()}
+          {activeTab === 'routine' && renderRoutine()}
           {activeTab === 'profile' && renderProfile()}
         </div>
 
@@ -1891,19 +2029,19 @@ export default function LifeSync() {
               </div>
 
               <button 
+                onClick={() => setActiveTab('routine')}
+                className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'routine' ? 'text-orange-400' : 'text-zinc-600'}`}
+              >
+                <ListChecks size={24} />
+                <span className="text-[10px] font-medium">Routine</span>
+              </button>
+
+              <button 
                 onClick={() => setActiveTab('coach')}
                 className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'coach' ? 'text-violet-400' : 'text-zinc-600'}`}
               >
                 <Sparkles size={24} />
                 <span className="text-[10px] font-medium">Coach</span>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('detox')}
-                className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'detox' ? 'text-cyan-400' : 'text-zinc-600'}`}
-              >
-                <Brain size={24} />
-                <span className="text-[10px] font-medium">Detox</span>
               </button>
 
             </div>
