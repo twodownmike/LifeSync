@@ -248,7 +248,7 @@ const Button = ({ onClick, variant = "primary", children, className = "", icon: 
   );
 };
 
-const TimelineEntry = ({ entry, onDelete }) => {
+const TimelineEntry = ({ entry, onDelete, fastDuration }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -266,9 +266,16 @@ const TimelineEntry = ({ entry, onDelete }) => {
       >
         <div className="flex justify-between items-start">
            <div className="flex-1 pr-4">
-             <span className="text-xs font-mono text-zinc-500 mb-1 block">
-               {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-             </span>
+             <div className="flex items-center gap-2 mb-1">
+               <span className="text-xs font-mono text-zinc-500">
+                 {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+               </span>
+               {fastDuration && (
+                 <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                   {fastDuration} Fast
+                 </span>
+               )}
+             </div>
              <h3 className="text-lg font-semibold text-zinc-200 group-hover:text-white transition-colors flex items-center gap-2">
                 {entry.title}
              </h3>
@@ -1040,6 +1047,35 @@ export default function LifeSync() {
         </div>
       </div>
 
+      {/* Fast Timer Widget */}
+      <div className="mb-8 bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl flex items-center justify-between relative overflow-hidden group">
+         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+         
+         <div>
+            <div className="flex items-center gap-2 mb-1">
+               <Clock size={14} className="text-emerald-500" />
+               <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Current Fast</span>
+            </div>
+            <div className="text-3xl font-bold text-white font-mono tracking-tight">
+                {fastingData.hours}<span className="text-zinc-600 mx-0.5">:</span>{fastingData.minutes.toString().padStart(2, '0')}
+            </div>
+         </div>
+
+         <div className="text-right relative z-10">
+             <div className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded border ${
+                 fastingData.hours < 4 ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                 fastingData.hours < 12 ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                 fastingData.hours < 18 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 
+                 'bg-violet-500/10 text-violet-400 border-violet-500/20'
+             }`}>
+                 {fastingData.label}
+             </div>
+             <div className="text-[10px] text-zinc-500 mt-1 font-medium">
+                Goal: {userSettings.fastingGoal}h
+             </div>
+         </div>
+      </div>
+
       {entries.length === 0 ? (
         <div className="text-center py-20 opacity-50">
           <div className="inline-block p-4 rounded-full bg-zinc-900 mb-4">
@@ -1049,9 +1085,19 @@ export default function LifeSync() {
         </div>
       ) : (
         <div className="relative border-l-2 border-zinc-800 ml-4 space-y-8">
-          {entries.map((entry) => (
-            <TimelineEntry key={entry.id} entry={entry} onDelete={handleDelete} />
-          ))}
+          {entries.map((entry, index) => {
+            let fastDuration = null;
+            if (entry.type === 'meal') {
+               const prevMeal = entries.slice(index + 1).find(e => e.type === 'meal');
+               if (prevMeal) {
+                  const diffMs = new Date(entry.timestamp) - new Date(prevMeal.timestamp);
+                  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                  fastDuration = `${hours}h ${minutes}m`;
+               }
+            }
+            return <TimelineEntry key={entry.id} entry={entry} onDelete={handleDelete} fastDuration={fastDuration} />;
+          })}
         </div>
       )}
     </div>
@@ -2124,7 +2170,6 @@ export default function LifeSync() {
         </div>
 
         {/* Bottom Nav */}
-        {activeTab !== 'profile' && (
           <nav className="fixed bottom-0 left-0 right-0 z-30 bg-zinc-950/90 backdrop-blur-lg border-t border-zinc-800 pb-safe">
             <div className="max-w-md mx-auto px-2 h-20 flex items-center justify-between relative">
               
@@ -2184,13 +2229,17 @@ export default function LifeSync() {
                   <span className="text-[9px] font-medium">Coach</span>
                 </button>
                 
-                {/* Dummy Item for Spacing Balance */}
-                <div className="min-w-[40px] opacity-0 pointer-events-none"></div>
+                <button 
+                  onClick={() => setActiveTab('profile')}
+                  className={`flex flex-col items-center gap-1 min-w-[40px] transition-colors ${activeTab === 'profile' ? 'text-white' : 'text-zinc-600'}`}
+                >
+                  <User size={20} />
+                  <span className="text-[9px] font-medium">Profile</span>
+                </button>
               </div>
 
             </div>
           </nav>
-        )}
 
       </main>
 
