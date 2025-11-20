@@ -75,19 +75,19 @@ import {
 
 // --- Firebase Initialization ---
 const firebaseConfig = {
-  apiKey: "AIzaSyBODxsazcWZiANa_3eTjPL3ZZNVMdnaDvQ",
-  authDomain: "lifesync-91884.firebaseapp.com",
-  projectId: "lifesync-91884",
-  storageBucket: "lifesync-91884.firebasestorage.app",
-  messagingSenderId: "481070215124",
-  appId: "1:481070215124:web:4a6c1185bbd77099cbf041"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const appId = 'lifesync-91884';
+const appId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
 
 // --- Constants & Data ---
 
@@ -1021,23 +1021,23 @@ export default function LifeSync() {
         <div>
           <h2 className="text-2xl font-bold text-white">Timeline</h2>
           <p className="text-zinc-400 text-sm mb-3">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${bioPhase.color}`}>
-              <span className="text-[10px] font-bold uppercase tracking-wider">{bioPhase.title}</span>
-              <span className="w-1 h-1 rounded-full bg-current opacity-50"></span>
-              <span className="text-[10px] opacity-90 font-medium">{bioPhase.desc}</span>
+          <div className="flex flex-wrap gap-2">
+            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${bioPhase.color}`}>
+                <span className="text-[10px] font-bold uppercase tracking-wider">{bioPhase.title}</span>
+                <span className="w-1 h-1 rounded-full bg-current opacity-50"></span>
+                <span className="text-[10px] opacity-90 font-medium">{bioPhase.desc}</span>
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-800 bg-zinc-900/50 text-zinc-400">
+                <Clock size={12} />
+                <span className="text-[10px] font-bold font-mono">
+                  {fastingData.hours}:{fastingData.minutes.toString().padStart(2, '0')}
+                </span>
+                <span className="w-1 h-1 rounded-full bg-zinc-600"></span>
+                <span className="text-[10px] font-medium text-emerald-400">{fastingData.label}</span>
+            </div>
           </div>
         </div>
         
-        <div onClick={() => setActiveTab('profile')} className="cursor-pointer flex items-center gap-2 bg-zinc-900/50 p-1 pr-3 rounded-full border border-zinc-800 hover:bg-zinc-800 transition-colors">
-          <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700 overflow-hidden">
-            {user?.photoURL ? (
-               <img src={user.photoURL} alt="User" className="w-full h-full object-cover" />
-            ) : (
-               <span className="text-xs font-bold text-emerald-500">{userSettings.displayName.charAt(0).toUpperCase()}</span>
-            )}
-          </div>
-          <span className="text-xs font-medium text-zinc-300 max-w-[60px] truncate">{userSettings.displayName.split(' ')[0]}</span>
-        </div>
       </div>
 
       {entries.length === 0 ? (
@@ -2110,7 +2110,16 @@ export default function LifeSync() {
             <div className="w-2 h-8 bg-emerald-500 rounded-full"></div>
             <h1 className="text-xl font-bold tracking-tight text-white">LifeSync</h1>
           </div>
-          <div className="w-8"></div> 
+          <div onClick={() => setActiveTab('profile')} className="cursor-pointer flex items-center gap-2 bg-zinc-900/50 p-1 pr-3 rounded-full border border-zinc-800 hover:bg-zinc-800 transition-colors">
+            <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700 overflow-hidden">
+              {user?.photoURL ? (
+                 <img src={user.photoURL} alt="User" className="w-full h-full object-cover" />
+              ) : (
+                 <span className="text-xs font-bold text-emerald-500">{userSettings.displayName.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+            <span className="text-xs font-medium text-zinc-300 max-w-[60px] truncate">{userSettings.displayName.split(' ')[0]}</span>
+          </div> 
         </header>
 
         {/* Content */}
