@@ -229,6 +229,18 @@ const Card = ({ children, className = "", onClick }) => (
   </div>
 );
 
+const SidebarItem = ({ icon: Icon, label,QA, active, onClick }) => (
+  <button 
+    onClick={onClick}
+    className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all duration-200 group mb-1
+      ${active ? 'bg-zinc-800 text-white shadow-lg shadow-black/20' : 'text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300'}`}
+  >
+    <Icon size={20} className={`transition-colors ${active ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
+    <span className="font-medium text-sm">{label}</span>
+    {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>}
+  </button>
+);
+
 const Button = ({ onClick, variant = "primary", children, className = "", icon: Icon, disabled }) => {
   const baseStyle = "flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100";
   const variants = {
@@ -859,7 +871,7 @@ export default function LifeSync() {
     }
   };
 
-  const closeModal = () => {
+  constQbcloseModal = () => {
     setIsModalOpen(false);
     setNote('');
     setTitle('');
@@ -1941,8 +1953,8 @@ export default function LifeSync() {
     if (!isTypeSelectorOpen) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
-        <div className="w-full max-w-md space-y-3 mb-24 animate-slide-up">
+      <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="w-full max-w-md space-y-3 mb-24 md:mb-0 animate-slide-up">
           <div className="text-center text-zinc-400 mb-6 text-sm font-medium tracking-wide uppercase">What would you like to log?</div>
           
           {['meal', 'workout', 'journal'].map(type => {
@@ -2165,12 +2177,40 @@ export default function LifeSync() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30 flex">
       
-      <main className="max-w-md mx-auto min-h-screen flex flex-col relative">
+      {/* DESKTOP SIDEBAR */}
+      <aside className="hidden md:flex flex-col w-64 border-r border-zinc-800 bg-zinc-950 p-6 fixed h-full z-40">
+        <div className="flex items-center gap-2 mb-10 px-2">
+            <div className="w-2 h-8 bg-emerald-500 rounded-full"></div>
+            <h1 className="text-xl font-bold tracking-tight text-white">LifeSync</h1>
+        </div>
+
+        <nav className="space-y-2 flex-1">
+            <SidebarItem icon={Home} label="Home" active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+            <SidebarItem icon={Clock} label="Fasting" active={activeTab === 'fasting'} onClick={() => setActiveTab('fasting')} />
+            <SidebarItem icon={ListChecks} label="Plan" active={activeTab === 'routine'} onClick={() => setActiveTab('routine')} />
+            <SidebarItem icon={Brain} label="Detox" active={activeTab === 'detox'} onClick={() => setActiveTab('detox')} />
+            <SidebarItem icon={Sparkles} label="Coach" active={activeTab === 'coach'} onClick={() => setActiveTab('coach')} />
+            <SidebarItem icon={User} label="Profile" active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
+        </nav>
+
+        <div className="pt-6 border-t border-zinc-900">
+             <button 
+                onClick={() => setIsTypeSelectorOpen(true)}
+                className="flex items-center justify-center gap-2 w-full p-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+            >
+                <Plus size={20} />
+                <span>Log Entry</span>
+             </button>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT WRAPPER */}
+      <main className="flex-1 md:ml-64 relative min-h-screen flex flex-col">
         
-        {/* Header */}
-        <header className="sticky top-0 z-20 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800/50 px-6 py-4 flex justify-between items-center">
+        {/* MOBILE HEADER */}
+        <header className="md:hidden sticky top-0 z-20 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800/50 px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <div className="w-2 h-8 bg-emerald-500 rounded-full"></div>
             <h1 className="text-xl font-bold tracking-tight text-white">LifeSync</h1>
@@ -2178,18 +2218,20 @@ export default function LifeSync() {
           <div className="w-8"></div> 
         </header>
 
-        {/* Content */}
-        <div className="flex-1 p-6 overflow-y-auto h-[calc(100vh-160px)]"> 
-          {activeTab === 'home' && renderTimeline()}
-          {activeTab === 'fasting' && renderFasting()}
-          {activeTab === 'coach' && renderCoach()}
-          {activeTab === 'detox' && renderDetox()}
-          {activeTab === 'routine' && renderRoutine()}
-          {activeTab === 'profile' && renderProfile()}
+        {/* CONTENT AREA */}
+        <div className="flex-1 p-6 md:p-12 overflow-y-auto h-[calc(100vh-160px)] md:h-screen no-scrollbar"> 
+          <div className="max-w-2xl mx-auto w-full h-full"> {/* Centered content for desktop */}
+            {activeTab === 'home' && renderTimeline()}
+            {activeTab === 'fasting' && renderFasting()}
+            {activeTab === 'coach' && renderCoach()}
+            {activeTab === 'detox' && renderDetox()}
+            {activeTab === 'routine' && renderRoutine()}
+            {activeTab === 'profile' && renderProfile()}
+          </div>
         </div>
 
-        {/* Bottom Nav */}
-          <nav className="fixed bottom-0 left-0 right-0 z-30 bg-zinc-950/90 backdrop-blur-lg border-t border-zinc-800 pb-safe">
+        {/* MOBILE BOTTOM NAV */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-zinc-950/90 backdrop-blur-lg border-t border-zinc-800 pb-safe">
             <div className="max-w-md mx-auto px-2 h-20 flex items-center justify-between relative">
               
               {/* Left Side */}
@@ -2274,7 +2316,7 @@ export default function LifeSync() {
           from { transform: translateY(100%); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
-        @keyframes slide-down {
+        @keyframesSX slide-down {
           from { transform: translateY(-100%); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
