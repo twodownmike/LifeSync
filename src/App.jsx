@@ -890,15 +890,29 @@ export default function LifeSync() {
 
   // --- Render Views ---
 
+<<<<<<< HEAD
+  const handleFocusSessionComplete = async (durationMinutes, taskLabel, tag) => {
+    if (!user) return;
+    setIsSaving(true);
+    try {
+        const tags = ['productivity', 'deep_work'];
+        if (tag) tags.push(tag);
+
+=======
   const handleFocusSessionComplete = async (durationMinutes, taskLabel) => {
     if (!user) return;
     setIsSaving(true);
     try {
+>>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
         await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'entries'), {
             type: 'work_session',
             title: 'Deep Work Session',
             note: taskLabel ? `Worked on: ${taskLabel}` : 'Focus Session',
+<<<<<<< HEAD
+            tags: tags,
+=======
             tags: ['productivity', 'deep_work'],
+>>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
             duration: durationMinutes,
             timestamp: new Date().toISOString()
         });
@@ -1855,6 +1869,81 @@ export default function LifeSync() {
       </div>
     )
   }
+
+  const renderRoutineModal = () => {
+    if (!isRoutineModalOpen) return null;
+    
+    const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    
+    return (
+      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="bg-zinc-900 w-full max-w-sm rounded-3xl border border-zinc-800 p-6 animate-slide-up shadow-2xl">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-white">New Routine</h3>
+            <button onClick={() => setIsRoutineModalOpen(false)} className="p-2 text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800 transition-colors">
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+               <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Title</label>
+               <input 
+                 type="text" 
+                 placeholder="e.g. Morning Walk, Read 10 Pages" 
+                 value={routineTitle}
+                 onChange={(e) => setRoutineTitle(e.target.value)}
+                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
+               />
+            </div>
+
+            <div>
+               <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Type</label>
+               <div className="grid grid-cols-3 gap-2">
+                 {['mindset', 'exercise', 'diet'].map(t => (
+                   <button
+                     key={t}
+                     onClick={() => setRoutineType(t)}
+                     className={`px-3 py-2 rounded-lg text-xs font-bold capitalize border transition-all
+                       ${routineType === t 
+                         ? 'bg-zinc-800 text-white border-zinc-600' 
+                         : 'bg-transparent text-zinc-500 border-zinc-800 hover:border-zinc-700'}`}
+                   >
+                     {t}
+                   </button>
+                 ))}
+               </div>
+            </div>
+
+            <div>
+               <label className="text-xs text-zinc-500 font-medium uppercase block mb-2">Frequency</label>
+               <div className="flex justify-between gap-1">
+                 {days.map((d, i) => (
+                   <button
+                     key={i}
+                     onClick={() => toggleDay(i)}
+                     className={`w-8 h-8 rounded-full text-xs font-bold transition-all
+                       ${routineDays.includes(i)
+                         ? 'bg-emerald-500 text-black' 
+                         : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700'}`}
+                   >
+                     {d}
+                   </button>
+                 ))}
+               </div>
+               <p className="text-[10px] text-zinc-500 mt-2 text-center">
+                 {routineDays.length === 0 ? 'Every day' : 'Selected days only'}
+               </p>
+            </div>
+            
+            <Button onClick={handleCreateRoutine} disabled={isSaving || !routineTitle} className="w-full mt-4">
+              {isSaving ? 'Creating...' : 'Create Routine'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   if (authLoading) {
     return (
