@@ -890,29 +890,17 @@ export default function LifeSync() {
 
   // --- Render Views ---
 
-<<<<<<< HEAD
   const handleFocusSessionComplete = async (durationMinutes, taskLabel, tag) => {
     if (!user) return;
     setIsSaving(true);
     try {
         const tags = ['productivity', 'deep_work'];
         if (tag) tags.push(tag);
-
-=======
-  const handleFocusSessionComplete = async (durationMinutes, taskLabel) => {
-    if (!user) return;
-    setIsSaving(true);
-    try {
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
         await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'entries'), {
             type: 'work_session',
             title: 'Deep Work Session',
             note: taskLabel ? `Worked on: ${taskLabel}` : 'Focus Session',
-<<<<<<< HEAD
             tags: tags,
-=======
-            tags: ['productivity', 'deep_work'],
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
             duration: durationMinutes,
             timestamp: new Date().toISOString()
         });
