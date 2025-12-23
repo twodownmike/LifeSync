@@ -9,16 +9,12 @@ import {
   Brain, 
   Volume2, 
   VolumeX,
-<<<<<<< HEAD
   Clock,
   Code,
   PenTool,
   Book,
   Calendar,
   Layout
-=======
-  Clock
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
 } from 'lucide-react';
 
 const AUDIO_MODES = [
@@ -33,7 +29,6 @@ const DURATIONS = [
   { label: '90m', min: 90 },
 ];
 
-<<<<<<< HEAD
 const TASK_TAGS = [
   { id: 'coding', label: 'Coding', icon: Code },
   { id: 'writing', label: 'Writing', icon: PenTool },
@@ -42,17 +37,12 @@ const TASK_TAGS = [
   { id: 'design', label: 'Design', icon: Layout },
 ];
 
-=======
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
 export default function FocusMode({ onSessionComplete }) {
   const [isActive, setIsActive] = useState(false);
   const [duration, setDuration] = useState(25); // minutes
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [task, setTask] = useState('');
-<<<<<<< HEAD
   const [selectedTag, setSelectedTag] = useState('coding');
-=======
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
   const [audioMode, setAudioMode] = useState('none');
   const [showVolume, setShowVolume] = useState(false);
   
@@ -68,11 +58,7 @@ export default function FocusMode({ onSessionComplete }) {
       audioCtxRef.current = new AudioContext();
       gainNodeRef.current = audioCtxRef.current.createGain();
       gainNodeRef.current.connect(audioCtxRef.current.destination);
-<<<<<<< HEAD
       gainNodeRef.current.gain.value = 0.05; // Lower default volume
-=======
-      gainNodeRef.current.gain.value = 0.1; // Default low volume
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
     }
     if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume();
@@ -118,11 +104,7 @@ export default function FocusMode({ onSessionComplete }) {
     stopAudio();
     initAudio();
     // 40Hz Gamma (Focus)
-<<<<<<< HEAD
     // Left: 200Hz, Right: 240Hz
-=======
-    // Left: 400Hz, Right: 440Hz
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
     
     const createOsc = (freq, pan) => {
         const osc = audioCtxRef.current.createOscillator();
@@ -163,11 +145,7 @@ export default function FocusMode({ onSessionComplete }) {
         setTimeLeft((time) => {
             if (time <= 1) {
                 setIsActive(false);
-<<<<<<< HEAD
                 if (onSessionComplete) onSessionComplete(duration, task, selectedTag);
-=======
-                if (onSessionComplete) onSessionComplete(duration, task);
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
                 const notification = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // Simple chime
                 notification.play().catch(e => console.log("Audio play failed", e));
                 return 0;
@@ -179,16 +157,10 @@ export default function FocusMode({ onSessionComplete }) {
       clearInterval(interval);
     }
     return () => clearInterval(interval);
-<<<<<<< HEAD
   }, [isActive, timeLeft, duration, task, selectedTag, onSessionComplete]);
 
   const toggleTimer = () => {
     if (!isActive) initAudio(); // Ensure audio context is ready
-=======
-  }, [isActive, timeLeft, duration, task, onSessionComplete]);
-
-  const toggleTimer = () => {
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
     setIsActive(!isActive);
   };
 
@@ -223,7 +195,6 @@ export default function FocusMode({ onSessionComplete }) {
         </div>
       </div>
 
-<<<<<<< HEAD
       <div className="flex-1 flex flex-col items-center justify-center space-y-6">
         
         {/* Timer Display */}
@@ -234,24 +205,11 @@ export default function FocusMode({ onSessionComplete }) {
                     cx="128"
                     cy="128"
                     r="120"
-=======
-      <div className="flex-1 flex flex-col items-center justify-center space-y-8">
-        
-        {/* Timer Display */}
-        <div className="relative w-72 h-72 flex items-center justify-center">
-            {/* Progress Circle */}
-            <svg className="absolute inset-0 w-full h-full -rotate-90">
-                <circle
-                    cx="144"
-                    cy="144"
-                    r="136"
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
                     stroke="#27272a" // zinc-800
                     strokeWidth="4"
                     fill="transparent"
                 />
                 <circle
-<<<<<<< HEAD
                     cx="128"
                     cy="128"
                     r="120"
@@ -260,27 +218,13 @@ export default function FocusMode({ onSessionComplete }) {
                     fill="transparent"
                     strokeDasharray={2 * Math.PI * 120}
                     strokeDashoffset={2 * Math.PI * 120 * (1 - progress / 100)}
-=======
-                    cx="144"
-                    cy="144"
-                    r="136"
-                    stroke="#06b6d4" // cyan-500
-                    strokeWidth="8"
-                    fill="transparent"
-                    strokeDasharray={2 * Math.PI * 136}
-                    strokeDashoffset={2 * Math.PI * 136 * (1 - progress / 100)}
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
                     strokeLinecap="round"
                     className="transition-all duration-1000 ease-linear"
                 />
             </svg>
 
             <div className="z-10 text-center flex flex-col items-center">
-<<<<<<< HEAD
                 <div className="text-6xl font-mono font-bold text-white tracking-tighter mb-2 tabular-nums">
-=======
-                <div className="text-7xl font-mono font-bold text-white tracking-tighter mb-2 tabular-nums">
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
                     {formatTime(timeLeft)}
                 </div>
                 
@@ -293,28 +237,19 @@ export default function FocusMode({ onSessionComplete }) {
                                 ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700' 
                                 : 'bg-cyan-500 text-black hover:bg-cyan-400 shadow-lg shadow-cyan-500/20'}`}
                     >
-<<<<<<< HEAD
                         {isActive ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
-=======
-                        {isActive ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
                     </button>
                     
                     <button 
                         onClick={resetTimer}
                         className="p-3 rounded-full bg-zinc-900 text-zinc-500 hover:text-white hover:bg-zinc-800 border border-zinc-800 transition-all"
                     >
-<<<<<<< HEAD
                         <RotateCcw size={18} />
-=======
-                        <RotateCcw size={20} />
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
                     </button>
                 </div>
             </div>
         </div>
 
-<<<<<<< HEAD
         {/* Task Tag Selection */}
         {!isActive && (
           <div className="w-full max-w-sm px-4">
@@ -340,8 +275,6 @@ export default function FocusMode({ onSessionComplete }) {
           </div>
         )}
 
-=======
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
         {/* Task Input */}
         <div className="w-full max-w-sm px-4">
             <div className="relative group">
@@ -366,11 +299,7 @@ export default function FocusMode({ onSessionComplete }) {
                     <button
                         key={d.min}
                         onClick={() => handleDurationChange(d.min)}
-<<<<<<< HEAD
                         className={`px-4 py-2 rounded-lg text-xs font-bold border transition-all
-=======
-                        className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
                             ${duration === d.min 
                                 ? 'bg-zinc-800 text-white border-zinc-600' 
                                 : 'bg-transparent text-zinc-500 border-zinc-800 hover:border-zinc-700'}`}
@@ -382,20 +311,12 @@ export default function FocusMode({ onSessionComplete }) {
         )}
 
         {/* Audio Controls */}
-<<<<<<< HEAD
         <div className="w-full max-w-sm px-4">
-=======
-        <div className="w-full max-w-sm px-4 mt-4">
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
             <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 text-zinc-400 text-xs font-bold uppercase tracking-wider">
                         <Headphones size={14} /> Soundscape
                     </div>
-<<<<<<< HEAD
-=======
-                    {/* Volume Slider (Hidden for simplicity in V1, assumed fixed low volume) */}
->>>>>>> 7dceb403f28b359a147e5c8e5f90a86973437ab1
                 </div>
                 
                 <div className="grid grid-cols-3 gap-2">
