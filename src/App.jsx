@@ -1527,20 +1527,20 @@ export default function LifeSync() {
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500 placeholder:text-zinc-700 font-mono text-sm"
-              />
-              <p className="text-[10px] text-zinc-500 mt-1">
-                Saved locally in your browser. Never synced to server.
-              </p>
-            </div>
+               />
+               <p className="text-[10px] text-zinc-500 mt-1">
+                 Saved locally in your browser. Never synced to server.
+               </p>
+             </div>
 
-            <Button onClick={handleSaveSettings} disabled={isSaving} className="w-full mt-2">
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
-        </Card>
+              <Button onClick={handleSaveSettings} disabled={isSaving} className="w-full mt-2">
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </Card>
+        </div>
       </div>
-    </div>
-  };
+    );
 
   // --- Modals ---
 
