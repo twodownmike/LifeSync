@@ -47,8 +47,7 @@ import {
   ListChecks,
   CheckCircle,
   Circle,
-  BarChart2,
-  Brain
+  BarChart2
 } from 'lucide-react';
 
 import FocusMode from './FocusMode';
